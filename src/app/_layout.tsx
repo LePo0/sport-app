@@ -37,7 +37,6 @@ function AppTabs() {
                 name="index"
                 options={{
                     href: null,
-                    tabBarButton: () => null,
                 }}
             />
             <Tabs.Screen
