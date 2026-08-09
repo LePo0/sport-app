@@ -34,6 +34,13 @@ function AppTabs() {
             }}
         >
             <Tabs.Screen
+                name="index"
+                options={{
+                    href: null,
+                    tabBarButton: () => null,
+                }}
+            />
+            <Tabs.Screen
                 name="exercises"
                 options={{
                     title: 'Exercices',
