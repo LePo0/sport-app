@@ -51,6 +51,15 @@ function AppTabs() {
                     ),
                 }}
             />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: 'Profil',
+                    tabBarIcon: ({ color }) => (
+                        <MaterialCommunityIcons name="account-circle-outline" size={22} color={color} />
+                    ),
+                }}
+            />
         </Tabs>
     );
 }
