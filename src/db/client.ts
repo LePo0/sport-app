@@ -9,7 +9,9 @@ import * as schema from './schema';
  * active les contraintes de clés étrangères, et retourne une instance Drizzle
  * avec le schéma typé.
  */
-const sqliteDatabase = openDatabaseSync('myfit.db');
+const sqliteDatabase = openDatabaseSync('myfit.db', {
+    enableChangeListener: true,
+});
 
 // Activation des contraintes de clés étrangères
 sqliteDatabase.execSync('PRAGMA foreign_keys = ON');
@@ -19,5 +21,10 @@ sqliteDatabase.execSync('PRAGMA foreign_keys = ON');
  * Utiliser `db` pour tous les accès à la base de données
  */
 export const db = drizzle(sqliteDatabase, { schema });
+
+/**
+ * Exporte la base de données SQLite native pour les listeners
+ */
+export { sqliteDatabase };
 
 export default db;

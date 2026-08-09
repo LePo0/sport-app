@@ -1,7 +1,7 @@
 {
   "name": "sport-app",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "expo": "~57.0.11",
@@ -10,10 +10,11 @@
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.2"
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "~5.7.0"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.2.8",
     "drizzle-kit": "^0.31.10",
     "typescript": "~6.0.3"
   },
