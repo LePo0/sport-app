@@ -189,7 +189,20 @@ export default function ProgramPlayerScreen() {
         if (!programId) return;
         setIsSavingSession(true);
         try {
-            await createSession(programId, new Date(), elapsedSeconds);
+            await createSession(
+                programId,
+                programName,
+                new Date(),
+                elapsedSeconds,
+                sequence.map((step, index) => ({
+                    stepType: step.stepType,
+                    exerciseName: step.stepType === StepType.EXERCISE ? step.exerciseName : null,
+                    orderIndex: index,
+                    sets: step.sets,
+                    reps: step.reps,
+                    durationSeconds: step.durationSeconds,
+                }))
+            );
             clearTimer();
             if (router.canGoBack()) {
                 router.back();

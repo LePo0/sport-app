@@ -1,78 +1,64 @@
 CONTEXTE
 --------
 Stack : React Native (Expo) + Drizzle ORM + SQLite, projet local-only.
-Tables : profile (id, height_cm) — singleton géré via upsertProfile() déjà
-existant dans profileDao —, weight_entries (id, date, weight_kg).
+Tables : sessions (id, program_id, date, total_duration_seconds),
+programs (id, name, rounds), program_steps (pour le détail éventuel).
 
-Convention projet : pas de repository layer, DAO consommés directement par
-les écrans. Logique métier (calcul IMC) dans services/, pas dans le composant
-écran directement.
+Convention projet : pas de repository layer, DAO consommés directement
+par les écrans. DAO scopés aux besoins réels de l'écran.
 
-OBJECTIF
---------
-Écran Profil (ProfileScreen) regroupant : gestion de la taille, calcul
-d'IMC à la volée, ajout et historique des entrées de poids.
+DÉPENDANCE À AJOUTER
+-------------------------
+npx expo install react-native-calendars
+(seule lib externe ajoutée pour cet écran, décision assumée pour ne pas
+recoder une grille de calendrier à la main)
 
-1. services/bmi.ts — LOGIQUE MÉTIER
+1. sessionDao — NOUVELLES FONCTIONS SCOPÉES
+------------------------------------------------
+- getSessionDates(): Promise<string[]>
+  Retourne les dates distinctes (format 'YYYY-MM-DD') ayant au moins une
+  session, pour alimenter les markedDates du calendrier
+- getSessionsForDate(date: string): Promise<{ id: number, programId: number,
+  programName: string, totalDurationSeconds: number }[]>
+  Jointure sessions -> programs sur program_id, filtré sur la date
+  (comparaison sur la partie date uniquement, pas l'heure)
+- getSessionDetail(sessionId: number): Promise<{ id: number, programName: string,
+  date: Date, totalDurationSeconds: number } | null>
+  Pour l'écran de détail d'une séance
+
+2. ÉCRAN CalendarScreen — STRUCTURE
 ----------------------------------------
-- calculateBmi(heightCm: number, weightKg: number): number
-  Formule : weightKg / (heightCm / 100) ** 2, arrondi à 1 décimale
-- Pas de branchement UI ici, fonction pure testable isolément
+- Composant Calendar de react-native-calendars
+- markedDates alimenté par getSessionDates() au montage (marker simple,
+  type 'dot' ou couleur de fond sur les jours ayant une séance)
+- onDayPress(day) :
+  - appelle getSessionsForDate(day.dateString)
+  - si résultat vide : ne rien afficher (jour sans séance, pas d'action)
+  - si résultat non vide : afficher en dessous du calendrier (pas de
+    modal nécessaire, une simple liste qui s'affiche/se met à jour sous
+    le calendrier suffit) la liste des séances de ce jour : nom du
+    programme + durée formatée (mm:ss ou hh:mm:ss)
+  - chaque item de cette liste est tapable et navigue vers
+    SessionDetailScreen avec sessionId en param
 
-2. weightEntryDao — NOUVELLES FONCTIONS SCOPÉES
-----------------------------------------------------
-- getAllWeightEntries(): Promise<WeightEntry[]>
-  (triées par date décroissante, la plus récente en premier)
-- getLatestWeightEntry(): Promise<WeightEntry | null>
-  (utilisée pour le calcul IMC, indépendamment de la liste affichée)
-- addWeightEntry(date: Date, weightKg: number): Promise<number>
-- deleteWeightEntry(id: number): Promise<void>
-
-3. profileDao — VÉRIFIER L'EXISTANT
------------------------------------------
-upsertProfile(heightCm: number) existe déjà. Ajouter si absent :
-- getProfile(): Promise<Profile | null>
-
-4. ÉCRAN ProfileScreen — STRUCTURE
----------------------------------------
-Un seul écran, trois sections verticales :
-
-A. Section Profil
-   - Champ numérique "Taille (cm)", pré-rempli via getProfile() au montage
-   - Bouton "Enregistrer" appelant upsertProfile(heightCm)
-   - Pas de validation complexe, juste s'assurer que la valeur saisie est
-     un nombre positif avant d'enregistrer
-
-B. Section IMC (lecture seule, pas de formulaire)
-   - Récupérer heightCm (profil) et le poids via getLatestWeightEntry()
-   - Si les deux sont disponibles : afficher l'IMC calculé via
-     calculateBmi(), avec la catégorie associée (insuffisance pondérale
-     / poids normal / surpoids / obésité — seuils OMS standards 18.5,
-     25, 30)
-   - Si taille absente ou aucune entrée de poids : afficher un message
-     du type "Renseignez votre taille et un poids pour calculer l'IMC"
-     plutôt qu'un calcul erroné ou un crash
-
-C. Section Historique de poids
-   - Formulaire d'ajout en haut : champ numérique "Poids (kg)" + date
-     (par défaut aujourd'hui, pas besoin de date picker complexe, une
-     valeur par défaut suffit pour l'instant sauf si tu veux pouvoir
-     antidater une entrée — dans ce cas un simple DateTimePicker Expo)
-   - Bouton "Ajouter" appelant addWeightEntry(date, weightKg), puis
-     rafraîchissement de la liste et du calcul IMC (B) en conséquence
-   - Liste des entrées (getAllWeightEntries), affichage simple :
-     date formatée + poids, triée du plus récent au plus ancien
-   - Chaque entrée a un bouton "Supprimer" (icône ou texte) appelant
-     deleteWeightEntry(id), avec confirmation légère (Alert.alert) avant
-     suppression pour éviter un tap accidentel
-   - Après suppression, rafraîchir la liste ET le calcul IMC si l'entrée
-     supprimée était la plus récente
+3. ÉCRAN SessionDetailScreen
+----------------------------------
+- Récupère les détails via getSessionDetail(sessionId)
+- Affiche : nom du programme, date (formatée), durée totale formatée
+- Optionnel mais utile : afficher aussi la liste des steps du programme
+  tel qu'il existe actuellement (via programStepDao.getStepsForProgram)
+  pour rappel de ce que contenait la séance — attention, ce n'est PAS un
+  instantané figé de ce qui a été fait ce jour-là, juste la structure
+  actuelle du programme (si le programme a été modifié depuis, l'affichage
+  reflète sa version actuelle, pas celle du jour de la séance). Ajouter
+  un court texte explicatif si tu gardes cette section, ex. "Structure
+  actuelle du programme" pour éviter toute confusion.
 
 CONTRAINTES
 -----------
-- Pas de graphique, pas de nouvelle dépendance de charting
-- Pas de nouvelle dépendance externe en général, sauf DateTimePicker Expo
-  si tu choisis l'option date antidatable (déjà dans l'écosystème Expo,
-  pas une lib tierce à ajouter)
-- État local en useState, rafraîchissement des listes par re-fetch après
-  chaque mutation (pas de state global synchronisé)
+- Une seule dépendance externe ajoutée (react-native-calendars), aucune
+  autre
+- État local en useState, re-fetch après navigation retour si besoin
+  (pas de state global)
+- Pas de gestion de suppression de session depuis cet écran (hors scope,
+  à ajouter plus tard si besoin)

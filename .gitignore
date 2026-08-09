@@ -39,3 +39,5 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+.github/instructions/instant-instructions.md

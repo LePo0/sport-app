@@ -8,6 +8,13 @@
       "when": 1786262533008,
       "tag": "0000_short_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786280000000,
+      "tag": "0001_session_snapshot",
+      "breakpoints": true
     }
   ]
 }

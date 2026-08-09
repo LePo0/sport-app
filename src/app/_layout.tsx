@@ -52,6 +52,15 @@ function AppTabs() {
                 }}
             />
             <Tabs.Screen
+                name="sessions"
+                options={{
+                    title: 'Séances',
+                    tabBarIcon: ({ color }) => (
+                        <MaterialCommunityIcons name="calendar-month-outline" size={22} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
                 name="profile"
                 options={{
                     title: 'Profil',

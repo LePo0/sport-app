@@ -50,8 +50,25 @@ export const sessions = sqliteTable('sessions', {
     programId: text()
         .notNull()
         .references(() => programs.id, { onDelete: 'cascade' }),
+    programName: text().notNull(),
     date: integer().notNull(), // timestamp en ms
     totalDurationSeconds: integer().notNull(),
+});
+
+/**
+ * Table sessionSteps — instantané immuable des steps réellement joués lors d'une session.
+ */
+export const sessionSteps = sqliteTable('sessionSteps', {
+    id: integer().primaryKey({ autoIncrement: true }),
+    sessionId: text()
+        .notNull()
+        .references(() => sessions.id, { onDelete: 'cascade' }),
+    stepType: text().$type<StepType>().notNull(),
+    exerciseName: text(),
+    orderIndex: integer().notNull(),
+    sets: integer(),
+    reps: integer(),
+    durationSeconds: integer(),
 });
 
 /**
