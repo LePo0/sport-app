@@ -7,12 +7,12 @@ import migrations from '../../drizzle/migrations';
  * Retourne l'état de migration : pending, success, ou error
  */
 export function useDatabaseMigrations() {
-  const { success, error } = useMigrations(db, migrations);
+    const { success, error } = useMigrations(db, migrations);
 
-  return {
-    isLoading: !success && !error,
-    isSuccess: success,
-    isError: !!error,
-    error,
-  };
+    return {
+        isLoading: !success && !error,
+        isSuccess: success,
+        isError: !!error,
+        error,
+    };
 }
