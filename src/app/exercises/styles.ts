@@ -1,20 +1,22 @@
 import { StyleSheet } from 'react-native';
+import { colors } from '../../theme/colors';
+import { glowMd } from '../../theme/glow';
 
 export const exerciseEditStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0D1117',
+        backgroundColor: colors.background,
     },
     centerContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#0D1117',
+        backgroundColor: colors.background,
     },
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        color: '#7A8BA3',
+        color: colors.textSecondary,
     },
     content: {
         padding: 16,
@@ -22,7 +24,7 @@ export const exerciseEditStyles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#E8EDF5',
+        color: colors.textPrimary,
         marginBottom: 16,
     },
     fieldGroup: {
@@ -31,18 +33,18 @@ export const exerciseEditStyles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.border,
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 10,
         fontSize: 14,
-        color: '#E8EDF5',
+        color: colors.textPrimary,
     },
     actions: {
         flexDirection: 'row',
@@ -58,25 +60,28 @@ export const exerciseEditStyles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButton: {
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.border,
     },
     cancelButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#7A8BA3',
+        color: colors.textSecondary,
     },
     saveButton: {
-        backgroundColor: '#00A8FF',
+        backgroundColor: colors.accentPrimary,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.25)',
+        ...glowMd(),
     },
     saveButtonDisabled: {
-        backgroundColor: '#1A2332',
+        backgroundColor: colors.disabled,
     },
     saveButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#0D1117',
+        color: colors.background,
     },
 });
 

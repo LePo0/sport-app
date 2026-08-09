@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
+import { colors } from '../../theme/colors';
 
 const headerTheme = {
-    headerStyle: { backgroundColor: '#0D1117' },
-    headerTintColor: '#00A8FF',
-    headerTitleStyle: { fontSize: 18, fontWeight: '600' as const, color: '#E8EDF5' },
+    headerStyle: { backgroundColor: colors.background },
+    headerTintColor: colors.accentPrimary,
+    headerTitleStyle: { fontSize: 18, fontWeight: '600' as const, color: colors.textPrimary },
     headerShadowVisible: false,
 };
 

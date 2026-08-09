@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MetricType } from '../types/enums';
+import { colors } from '../theme/colors';
 
 interface MetricTypeToggleProps {
     value: MetricType;
@@ -43,13 +44,13 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         marginBottom: 8,
     },
     segmentedControl: {
         flexDirection: 'row',
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.border,
         borderRadius: 8,
         overflow: 'hidden',
     },
@@ -57,22 +58,22 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 10,
         alignItems: 'center',
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
     },
     segmentActive: {
-        backgroundColor: '#00A8FF',
+        backgroundColor: colors.accentPrimary,
     },
     segmentText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#7A8BA3',
+        color: colors.textSecondary,
     },
     segmentTextActive: {
-        color: '#0D1117',
+        color: colors.background,
     },
     helperText: {
         fontSize: 12,
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         marginTop: 6,
     },
 });

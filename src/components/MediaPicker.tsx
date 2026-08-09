@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MediaType } from '../types/enums';
+import { colors } from '../theme/colors';
 
 interface MediaPickerProps {
     mediaPath?: string;
@@ -54,40 +55,40 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         marginBottom: 8,
     },
     mediaContainer: {
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
         borderRadius: 8,
         padding: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.border,
     },
     mediaInfo: {
         fontSize: 14,
-        color: '#E8EDF5',
+        color: colors.textPrimary,
     },
     removeButton: {
         paddingHorizontal: 10,
         paddingVertical: 6,
-        backgroundColor: '#1A0A0F',
+        backgroundColor: colors.background,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#FF3B5C',
+        borderColor: colors.danger,
     },
     removeButtonText: {
         fontSize: 12,
-        color: '#FF3B5C',
+        color: colors.danger,
         fontWeight: '600',
     },
     placeholder: {
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.border,
         borderRadius: 8,
         borderStyle: 'dashed',
         paddingHorizontal: 16,
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
     },
     placeholderText: {
         fontSize: 12,
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         textAlign: 'center',
     },
 });

@@ -5,18 +5,24 @@ import {
     FlatList,
     TouchableOpacity,
     StyleSheet,
-    Alert,
     ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../../theme/colors';
+import { glowMd } from '../../theme/glow';
 import { Exercise } from '../../types/exercise';
-import { watchExercises, deleteExerciseById } from '../../db/queries/exerciseDao';
+import { watchExercises, deleteExerciseById, getProgramsUsingExercise } from '../../db/queries/exerciseDao';
 import { MetricType } from '../../types/enums';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { GlowRing } from '../../components/ui/GlowRing';
 
 export default function ExercisesListScreen() {
     const [exercises, setExercises] = useState<Exercise[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; programNames?: string[] } | null>(null);
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         // Ajoute l'écouteur sur la table exercises
@@ -29,26 +35,20 @@ export default function ExercisesListScreen() {
         return cleanup;
     }, []);
 
-    const handleDelete = (id: string, name: string) => {
-        Alert.alert('Supprimer', `Supprimer "${name}" ?`, [
-            {
-                text: 'Annuler',
-                onPress: () => { },
-                style: 'cancel',
-            },
-            {
-                text: 'Supprimer',
-                onPress: async () => {
-                    try {
-                        await deleteExerciseById(id);
-                    } catch (error) {
-                        Alert.alert('Erreur', 'Impossible de supprimer l\'exercice');
-                        console.error(error);
-                    }
-                },
-                style: 'destructive',
-            },
-        ]);
+    const handleDelete = async (id: string, name: string) => {
+        const usedIn = await getProgramsUsingExercise(id);
+        setDeleteTarget({ id, name, programNames: usedIn.map(p => p.programName) });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        try {
+            await deleteExerciseById(deleteTarget.id);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setDeleteTarget(null);
+        }
     };
 
     const handleEditExercise = (id: string) => {
@@ -85,7 +85,7 @@ export default function ExercisesListScreen() {
     if (isLoading) {
         return (
             <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color={colors.accentPrimary} />
                 <Text style={styles.loadingText}>Chargement des exercices...</Text>
             </View>
         );
@@ -108,18 +108,32 @@ export default function ExercisesListScreen() {
 
     return (
         <View style={styles.container}>
+            <ConfirmDialog
+                visible={!!deleteTarget}
+                title="Supprimer l'exercice"
+                message={
+                    deleteTarget?.programNames?.length
+                        ? `Cet exercice est utilisé dans : ${deleteTarget.programNames.join(', ')}.\nLe supprimer laissera ces étapes sans exercice associé. Continuer ?`
+                        : `Supprimer "${deleteTarget?.name}" ? Cette action est irréversible.`
+                }
+                confirmLabel="Supprimer"
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+            />
             <FlatList
                 data={exercises}
                 keyExtractor={(item) => item.id}
                 renderItem={renderExerciseItem}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
             />
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => router.push('/exercises/new')}
-            >
-                <Text style={styles.fabText}>+</Text>
-            </TouchableOpacity>
+            <GlowRing borderRadius={28} size="lg" style={{ position: 'absolute', right: 16 - 7, bottom: (16 + insets.bottom) - 7 }}>
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => router.push('/exercises/new')}
+                >
+                    <Text style={styles.fabText}>+</Text>
+                </TouchableOpacity>
+            </GlowRing>
         </View>
     );
 }
@@ -127,55 +141,54 @@ export default function ExercisesListScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0D1117',
+        backgroundColor: colors.background,
     },
     centerContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#0D1117',
+        backgroundColor: colors.background,
         paddingHorizontal: 16,
     },
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        color: '#7A8BA3',
+        color: colors.textSecondary,
     },
     emptyText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#E8EDF5',
+        color: colors.textPrimary,
         marginBottom: 8,
     },
     emptySubText: {
         fontSize: 14,
-        color: '#7A8BA3',
+        color: colors.textSecondary,
         marginBottom: 24,
     },
     createButton: {
-        backgroundColor: '#00A8FF',
+        backgroundColor: colors.accentPrimary,
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 8,
     },
     createButtonText: {
-        color: '#0D1117',
+        color: colors.background,
         fontSize: 14,
         fontWeight: '600',
     },
     listContent: {
         padding: 16,
-        paddingBottom: 80,
     },
     exerciseCard: {
-        backgroundColor: '#161B27',
+        backgroundColor: colors.surface,
         borderRadius: 8,
         padding: 12,
         marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#1A2332',
+        borderColor: colors.borderAccent,
     },
     exerciseContent: {
         flex: 1,
@@ -183,7 +196,7 @@ const styles = StyleSheet.create({
     exerciseName: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#E8EDF5',
+        color: colors.textPrimary,
         marginBottom: 6,
     },
     exerciseDetails: {
@@ -192,18 +205,18 @@ const styles = StyleSheet.create({
     },
     metricTypeLabel: {
         fontSize: 12,
-        color: '#00A8FF',
-        backgroundColor: '#0A1929',
+        color: colors.accentPrimary,
+        backgroundColor: colors.background,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#00A8FF',
+        borderColor: colors.accentPrimary,
     },
     mediaLabel: {
         fontSize: 12,
-        color: '#7A8BA3',
-        backgroundColor: '#1A2332',
+        color: colors.textSecondary,
+        backgroundColor: colors.border,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
@@ -214,26 +227,20 @@ const styles = StyleSheet.create({
     },
     deleteButtonText: {
         fontSize: 18,
-        color: '#FF3B5C',
+        color: colors.danger,
     },
     fab: {
-        position: 'absolute',
-        right: 16,
-        bottom: 16,
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#00A8FF',
+        backgroundColor: colors.accentPrimary,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#00A8FF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 8,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.30)',
     },
     fabText: {
-        color: '#0D1117',
+        color: colors.background,
         fontSize: 28,
         fontWeight: '300',
     },

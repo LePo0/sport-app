@@ -15,10 +15,12 @@ import {
     findExerciseById,
     insertExercise,
     updateExercise,
+    getProgramsUsingExercise,
 } from '../../db/queries/exerciseDao';
 import { MetricTypeToggle } from '../../components/MetricTypeToggle';
 import { MediaPicker } from '../../components/MediaPicker';
 import { exerciseEditStyles } from './styles';
+import { colors } from '../../theme/colors';
 
 export default function ExerciseEditScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
@@ -34,6 +36,7 @@ export default function ExerciseEditScreen() {
 
     const [isLoading, setIsLoading] = useState(isEditMode);
     const [isSaving, setIsSaving] = useState(false);
+    const [originalMetricType, setOriginalMetricType] = useState<MetricType | null>(null);
 
     useEffect(() => {
         if (isEditMode && id) loadExercise(id);
@@ -49,6 +52,7 @@ export default function ExerciseEditScreen() {
                     mediaPath: exercise.mediaPath ?? undefined,
                     mediaType: exercise.mediaType ?? undefined,
                 });
+                setOriginalMetricType(exercise.metricType);
             } else {
                 Alert.alert('Erreur', 'Exercice introuvable');
                 router.back();
@@ -66,6 +70,18 @@ export default function ExerciseEditScreen() {
         if (!formData.name.trim()) {
             Alert.alert('Erreur', 'Le nom de l\'exercice est obligatoire');
             return;
+        }
+
+        // Garde-fou : changement de metricType sur un exo utilisé dans des programmes
+        if (isEditMode && id && originalMetricType && formData.metricType !== originalMetricType) {
+            const usedIn = await getProgramsUsingExercise(id);
+            if (usedIn.length > 0) {
+                Alert.alert(
+                    'Modification impossible',
+                    `Impossible de changer le type de cet exercice : il est utilisé dans ${usedIn.map(p => p.programName).join(', ')}.\nRetirez-le de ces programmes d\'abord.`
+                );
+                return;
+            }
         }
 
         setIsSaving(true);
@@ -89,7 +105,7 @@ export default function ExerciseEditScreen() {
     if (isLoading) {
         return (
             <View style={exerciseEditStyles.centerContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color={colors.accentPrimary} />
                 <Text style={exerciseEditStyles.loadingText}>Chargement...</Text>
             </View>
         );

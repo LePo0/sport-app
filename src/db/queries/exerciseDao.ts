@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { eq } from 'drizzle-orm';
 import { db } from '../client';
-import { exercises } from '../schema';
+import { exercises, programs, programSteps } from '../schema';
 import { Exercise, ExerciseFormData } from '../../types/exercise';
 
 /**
@@ -78,6 +78,28 @@ export async function updateExercise(id: string, data: Partial<ExerciseFormData>
  */
 export async function deleteExerciseById(id: string): Promise<void> {
     await db.delete(exercises).where(eq(exercises.id, id));
+}
+
+/**
+ * Retourne les programmes qui utilisent un exercice donné (pour afficher un avertissement).
+ * Dédupliqué par programId — un programme peut avoir plusieurs steps avec le même exo.
+ */
+export async function getProgramsUsingExercise(
+    exerciseId: string
+): Promise<{ programId: string; programName: string }[]> {
+    const rows = await db
+        .select({ programId: programs.id, programName: programs.name })
+        .from(programSteps)
+        .innerJoin(programs, eq(programSteps.programId, programs.id))
+        .where(eq(programSteps.exerciseId, exerciseId))
+        .all();
+
+    const seen = new Set<string>();
+    return rows.filter(({ programId }) => {
+        if (seen.has(programId)) return false;
+        seen.add(programId);
+        return true;
+    });
 }
 
 /**
