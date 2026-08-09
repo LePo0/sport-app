@@ -20,7 +20,8 @@
       "predictiveBackGestureEnabled": false,
       "navigationBar": {
         "visible": "sticky-immersive"
-      }
+      },
+      "package": "com.lep0.sportapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
