@@ -25,6 +25,12 @@ export default function ProgramsLayout() {
                     return { title: id && id !== 'new' ? 'Modifier' : 'Nouveau programme' };
                 }}
             />
+            <Stack.Screen
+                name="play/[id]"
+                options={{
+                    title: 'Exécution',
+                }}
+            />
         </Stack>
     );
 }

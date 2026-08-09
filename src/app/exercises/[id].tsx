@@ -8,7 +8,7 @@ import {
     ScrollView,
     ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ExerciseFormData } from '../../types/exercise';
 import { MetricType } from '../../types/enums';
 import {
@@ -21,6 +21,7 @@ import { MetricTypeToggle } from '../../components/MetricTypeToggle';
 import { MediaPicker } from '../../components/MediaPicker';
 import { exerciseEditStyles } from './styles';
 import { colors } from '../../theme/colors';
+import { HeaderBackButton } from '../../components/ui/HeaderBackButton';
 
 export default function ExerciseEditScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
@@ -113,6 +114,12 @@ export default function ExerciseEditScreen() {
 
     return (
         <ScrollView style={exerciseEditStyles.container} showsVerticalScrollIndicator={false}>
+            <Stack.Screen
+                options={{
+                    headerBackVisible: false,
+                    headerLeft: () => <HeaderBackButton onPress={() => router.back()} />,
+                }}
+            />
             <View style={exerciseEditStyles.content}>
                 <Text style={exerciseEditStyles.sectionTitle}>Détails de l'exercice</Text>
 

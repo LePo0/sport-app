@@ -1,26 +1,30 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, ScrollView,
     StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { colors } from '../../theme/colors';
 import { StepType, MetricType } from '../../types/enums';
 import { StepWithExercise } from '../../types/program';
 import { Exercise } from '../../types/exercise';
 import { findAllExercises } from '../../db/queries/exerciseDao';
-import { createProgram, getAllPrograms, updateProgram } from '../../db/queries/programDao';
+import { createProgram, getProgramById, updateProgram } from '../../db/queries/programDao';
 import {
-    getStepsForProgram, addExerciseStep, addRestStep,
-    reorderStep, deleteStep,
+    getStepsForProgram, replaceProgramSteps,
 } from '../../db/queries/programStepDao';
 import { AddExerciseStepModal } from '../../components/AddExerciseStepModal';
 import { AddRestStepModal } from '../../components/AddRestStepModal';
+import { HeaderBackButton } from '../../components/ui/HeaderBackButton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
 export default function ProgramFormScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const router = useRouter();
+    const navigation = useNavigation<any>();
     const isEditMode = !!id && id !== 'new';
+    const isInternalNavigationRef = useRef(false);
 
     const [name, setName] = useState('');
     const [rounds, setRounds] = useState('1');
@@ -30,6 +34,11 @@ export default function ProgramFormScreen() {
     const [isSaving, setIsSaving] = useState(false);
     const [showExerciseModal, setShowExerciseModal] = useState(false);
     const [showRestModal, setShowRestModal] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [cancelTargetPath, setCancelTargetPath] = useState('/programs');
+    const [initialName, setInitialName] = useState('');
+    const [initialRounds, setInitialRounds] = useState('1');
+    const [initialSteps, setInitialSteps] = useState<StepWithExercise[]>([]);
 
     const loadSteps = useCallback(async (pid: string) => {
         const data = await getStepsForProgram(pid);
@@ -39,27 +48,58 @@ export default function ProgramFormScreen() {
     useEffect(() => {
         findAllExercises().then(setAllExercises).catch(console.error);
         if (isEditMode && id) loadSteps(id);
-    }, []);
+    }, [id, isEditMode, loadSteps]);
 
     useEffect(() => {
         if (!isEditMode || !id) return;
 
-        getAllPrograms()
-            .then((items) => {
-                const program = items.find((item) => item.id === id);
+        getProgramById(id)
+            .then((program) => {
                 if (!program) return;
                 setName(program.name);
                 setRounds(String(program.rounds));
+                setInitialName(program.name);
+                setInitialRounds(String(program.rounds));
             })
             .catch(console.error);
     }, [id, isEditMode]);
 
-    // Crée le programme en brouillon si ce n'est pas encore fait, retourne son id
-    const ensureProgramExists = async (): Promise<string> => {
-        if (programId) return programId;
-        const newId = await createProgram(name.trim() || 'Nouveau programme', parseInt(rounds) || 1);
-        setProgramId(newId);
-        return newId;
+    useEffect(() => {
+        if (!isEditMode || !id) return;
+
+        getStepsForProgram(id)
+            .then((items) => {
+                setInitialSteps(items);
+            })
+            .catch(console.error);
+    }, [id, isEditMode]);
+
+    useEffect(() => {
+        if (isEditMode && id) return;
+        setInitialSteps([]);
+    }, [id, isEditMode]);
+
+    const serializeSteps = (items: StepWithExercise[]) => JSON.stringify(
+        items.map((step) => ({
+            id: step.id,
+            stepType: step.stepType,
+            exerciseId: step.exerciseId,
+            orderIndex: step.orderIndex,
+            sets: step.sets,
+            reps: step.reps,
+            durationSeconds: step.durationSeconds,
+        }))
+    );
+
+    const persistableSteps = (pid: string) => steps.map((step, index) => ({
+        ...step,
+        programId: pid,
+        orderIndex: index,
+    }));
+
+    const navigateAway = (targetPath: string) => {
+        isInternalNavigationRef.current = true;
+        router.replace(targetPath);
     };
 
     const handleSave = async () => {
@@ -74,13 +114,15 @@ export default function ProgramFormScreen() {
         }
         setIsSaving(true);
         try {
-            if (programId) {
-                await updateProgram(programId, name.trim(), r);
+            if (isEditMode && id) {
+                await updateProgram(id, name.trim(), r);
+                await replaceProgramSteps(id, persistableSteps(id));
             } else {
                 const newId = await createProgram(name.trim(), r);
                 setProgramId(newId);
+                await replaceProgramSteps(newId, persistableSteps(newId));
             }
-            router.replace('/programs');
+            navigateAway('/programs');
         } catch (e) {
             Alert.alert('Erreur', 'Impossible de sauvegarder le programme');
             console.error(e);
@@ -93,31 +135,130 @@ export default function ProgramFormScreen() {
         exerciseId: string, sets: number | null, reps: number | null, durationSeconds: number | null
     ) => {
         setShowExerciseModal(false);
-        const pid = await ensureProgramExists();
-        await addExerciseStep(pid, exerciseId, steps.length, sets, reps, durationSeconds);
-        await loadSteps(pid);
+        const exercise = allExercises.find((item) => item.id === exerciseId);
+        if (!exercise) return;
+
+        setSteps((prev) => [
+            ...prev,
+            {
+                id: `local_step_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                programId: programId ?? 'draft_program',
+                stepType: StepType.EXERCISE,
+                exerciseId,
+                orderIndex: prev.length,
+                sets,
+                reps,
+                durationSeconds,
+                exerciseName: exercise.name,
+                exerciseMetricType: exercise.metricType,
+                mediaPath: exercise.mediaPath ?? null,
+                mediaType: exercise.mediaType ?? null,
+            },
+        ]);
     };
 
     const handleAddRest = async (durationSeconds: number) => {
         setShowRestModal(false);
-        const pid = await ensureProgramExists();
-        await addRestStep(pid, steps.length, durationSeconds);
-        await loadSteps(pid);
+        setSteps((prev) => [
+            ...prev,
+            {
+                id: `local_step_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+                programId: programId ?? 'draft_program',
+                stepType: StepType.REST,
+                exerciseId: null,
+                orderIndex: prev.length,
+                sets: null,
+                reps: null,
+                durationSeconds,
+                exerciseName: null,
+                exerciseMetricType: null,
+                mediaPath: null,
+                mediaType: null,
+            },
+        ]);
     };
 
-    const handleReorder = async (step: StepWithExercise, direction: 'up' | 'down') => {
-        const newIndex = direction === 'up' ? step.orderIndex - 1 : step.orderIndex + 1;
-        await reorderStep(step.id, newIndex);
-        if (programId) await loadSteps(programId);
+    const handleReorder = (step: StepWithExercise, direction: 'up' | 'down') => {
+        setSteps((prev) => {
+            const currentIndex = prev.findIndex((item) => item.id === step.id);
+            if (currentIndex < 0) return prev;
+
+            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
+            const next = [...prev];
+            [next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]];
+            return next.map((item, index) => ({ ...item, orderIndex: index }));
+        });
     };
 
-    const handleDeleteStep = async (stepId: string) => {
-        await deleteStep(stepId);
-        if (programId) await loadSteps(programId);
+    const handleDeleteStep = (stepId: string) => {
+        setSteps((prev) => prev
+            .filter((item) => item.id !== stepId)
+            .map((item, index) => ({ ...item, orderIndex: index }))
+        );
     };
+
+    const hasStepChanges = serializeSteps(steps) !== serializeSteps(initialSteps);
+    const hasMetadataChanges = name !== initialName || rounds !== initialRounds;
+    const hasUnsavedChanges = hasStepChanges || hasMetadataChanges;
+
+    const discardChangesAndExit = async (targetPath = '/programs') => {
+        navigateAway(targetPath);
+    };
+
+    const handleCancel = (targetPath = '/programs') => {
+        if (!hasUnsavedChanges) {
+            navigateAway(targetPath);
+            return;
+        }
+
+        setCancelTargetPath(targetPath);
+        setShowCancelDialog(true);
+    };
+
+    useEffect(() => {
+        const unsubscribeBeforeRemove = navigation.addListener('beforeRemove', (event: any) => {
+            if (isInternalNavigationRef.current || isSaving) return;
+            event.preventDefault();
+            handleCancel('/programs');
+        });
+
+        const parent: any = navigation.getParent();
+        const unsubscribeTabPress = parent?.addListener('tabPress', (event: any) => {
+            if (isInternalNavigationRef.current || isSaving) return;
+            event.preventDefault();
+            const state = parent.getState();
+            const route = state.routes.find((item: any) => item.key === event.target);
+            const targetPath = route?.name === 'exercises' ? '/exercises' : '/programs';
+            handleCancel(targetPath);
+        });
+
+        return () => {
+            unsubscribeBeforeRemove();
+            unsubscribeTabPress?.();
+        };
+    }, [navigation, isSaving, hasUnsavedChanges, name, rounds, steps, initialName, initialRounds, initialSteps]);
 
     return (
         <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+            <Stack.Screen
+                options={{
+                    headerBackVisible: false,
+                    headerLeft: () => <HeaderBackButton onPress={() => handleCancel()} />,
+                }}
+            />
+            <ConfirmDialog
+                visible={showCancelDialog}
+                title="Annuler les modifications"
+                message="Quitter sans enregistrer ? Les changements non sauvegardés seront perdus."
+                confirmLabel="Quitter"
+                onCancel={() => setShowCancelDialog(false)}
+                onConfirm={() => {
+                    setShowCancelDialog(false);
+                    discardChangesAndExit(cancelTargetPath).catch(console.error);
+                }}
+            />
             {/* Métadonnées */}
             <Text style={s.sectionTitle}>Informations</Text>
             <View style={s.fieldGroup}>
@@ -164,16 +305,16 @@ export default function ProgramFormScreen() {
                             style={[s.iconBtn, idx === 0 && s.iconBtnDisabled]}
                             onPress={() => handleReorder(step, 'up')} disabled={idx === 0}
                         >
-                            <Text style={s.iconBtnText}>↑</Text>
+                            <MaterialCommunityIcons name="arrow-up" size={18} style={s.iconBtnIcon} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[s.iconBtn, idx === steps.length - 1 && s.iconBtnDisabled]}
                             onPress={() => handleReorder(step, 'down')} disabled={idx === steps.length - 1}
                         >
-                            <Text style={s.iconBtnText}>↓</Text>
+                            <MaterialCommunityIcons name="arrow-down" size={18} style={s.iconBtnIcon} />
                         </TouchableOpacity>
                         <TouchableOpacity style={[s.iconBtn, s.iconBtnDanger]} onPress={() => handleDeleteStep(step.id)}>
-                            <Text style={[s.iconBtnText, s.iconBtnTextDanger]}>✕</Text>
+                            <MaterialCommunityIcons name="delete-outline" size={18} style={[s.iconBtnIcon, s.iconBtnIconDanger]} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -189,15 +330,33 @@ export default function ProgramFormScreen() {
                 </TouchableOpacity>
             </View>
 
+            {programId && steps.length > 0 ? (
+                <TouchableOpacity
+                    style={s.playBtn}
+                    onPress={() => router.push(`/programs/play/${programId}`)}
+                >
+                    <Text style={s.playBtnText}>Lancer le programme</Text>
+                </TouchableOpacity>
+            ) : null}
+
             {/* Enregistrer */}
-            <TouchableOpacity
-                style={[s.saveBtn, isSaving && s.saveBtnDisabled]}
-                onPress={handleSave} disabled={isSaving}
-            >
-                {isSaving
-                    ? <ActivityIndicator size="small" color={colors.background} />
-                    : <Text style={s.saveBtnText}>Enregistrer</Text>}
-            </TouchableOpacity>
+            <View style={s.footerActions}>
+                <TouchableOpacity
+                    style={s.cancelBtn}
+                    onPress={() => handleCancel()}
+                    disabled={isSaving}
+                >
+                    <Text style={s.cancelBtnText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[s.saveBtn, isSaving && s.saveBtnDisabled]}
+                    onPress={handleSave} disabled={isSaving}
+                >
+                    {isSaving
+                        ? <ActivityIndicator size="small" color={colors.background} />
+                        : <Text style={s.saveBtnText}>Enregistrer</Text>}
+                </TouchableOpacity>
+            </View>
 
             <AddExerciseStepModal
                 visible={showExerciseModal}
@@ -231,14 +390,19 @@ const s = StyleSheet.create({
     iconBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' },
     iconBtnDisabled: { opacity: 0.3 },
     iconBtnDanger: { borderWidth: 1, borderColor: colors.danger },
-    iconBtnText: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
-    iconBtnTextDanger: { color: colors.danger },
+    iconBtnIcon: { color: colors.textPrimary },
+    iconBtnIconDanger: { color: colors.danger },
     addRow: { flexDirection: 'row', gap: 12, marginTop: 4, marginBottom: 20 },
     addBtn: { flex: 1, paddingVertical: 11, borderRadius: 8, backgroundColor: colors.accentPrimary, alignItems: 'center' },
     addBtnSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.accentSecondary },
     addBtnText: { fontSize: 14, fontWeight: '600', color: colors.background },
     addBtnTextSecondary: { color: colors.accentSecondary },
-    saveBtn: { paddingVertical: 14, borderRadius: 8, backgroundColor: colors.accentPrimary, alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)' },
+    playBtn: { paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.accentSecondary, backgroundColor: colors.surfaceElevated, alignItems: 'center', marginBottom: 12 },
+    playBtnText: { fontSize: 14, fontWeight: '700', color: colors.accentSecondary },
+    footerActions: { flexDirection: 'row', gap: 12 },
+    cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceElevated, alignItems: 'center' },
+    cancelBtnText: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: colors.accentPrimary, alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)' },
     saveBtnDisabled: { opacity: 0.5 },
     saveBtnText: { fontSize: 15, fontWeight: '700', color: colors.background },
 });

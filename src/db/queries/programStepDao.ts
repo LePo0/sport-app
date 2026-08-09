@@ -21,6 +21,8 @@ export async function getStepsForProgram(programId: string): Promise<StepWithExe
             durationSeconds: programSteps.durationSeconds,
             exerciseName: exercises.name,
             exerciseMetricType: exercises.metricType,
+            mediaPath: exercises.mediaPath,
+            mediaType: exercises.mediaType,
         })
         .from(programSteps)
         .leftJoin(exercises, eq(programSteps.exerciseId, exercises.id))
@@ -102,4 +104,23 @@ export async function updateExerciseStepValues(
     durationSeconds: number | null
 ): Promise<void> {
     await db.update(programSteps).set({ sets, reps, durationSeconds }).where(eq(programSteps.id, stepId));
+}
+
+export async function replaceProgramSteps(programId: string, steps: StepWithExercise[]): Promise<void> {
+    await db.delete(programSteps).where(eq(programSteps.programId, programId));
+
+    if (steps.length === 0) return;
+
+    await db.insert(programSteps).values(
+        steps.map((step) => ({
+            id: step.id,
+            programId,
+            stepType: step.stepType,
+            exerciseId: step.exerciseId,
+            orderIndex: step.orderIndex,
+            sets: step.sets,
+            reps: step.reps,
+            durationSeconds: step.durationSeconds,
+        }))
+    );
 }

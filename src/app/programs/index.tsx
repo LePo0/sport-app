@@ -84,8 +84,8 @@ export default function ProgramsListScreen() {
                                 <Text style={s.meta}>{item.rounds} tour{item.rounds > 1 ? 's' : ''}</Text>
                             </TouchableOpacity>
                             <View style={s.cardActions}>
-                                <ActionIconButton icon="▶" disabled />
-                                <ActionIconButton icon="✕" variant="danger" onPress={() => setDeleteTarget(item)} />
+                                <ActionIconButton icon="play" onPress={() => router.push(`/programs/play/${item.id}`)} />
+                                <ActionIconButton icon="delete-outline" variant="danger" onPress={() => setDeleteTarget(item)} />
                             </View>
                         </View>
                     </ListCard>

@@ -21,6 +21,11 @@ export async function getAllPrograms(): Promise<{ id: string; name: string; roun
     return db.select().from(programs).all();
 }
 
+export async function getProgramById(id: string): Promise<{ id: string; name: string; rounds: number; createdAt: number } | null> {
+    const result = await db.select().from(programs).where(eq(programs.id, id)).get();
+    return result || null;
+}
+
 export function watchPrograms(
     callback: (programs: { id: string; name: string; rounds: number; createdAt: number }[]) => void
 ): () => void {

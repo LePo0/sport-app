@@ -1,6 +1,6 @@
 import { InferSelectModel } from 'drizzle-orm';
 import { programs, programSteps } from '../db/schema';
-import { MetricType, StepType } from './enums';
+import { MediaType, MetricType, StepType } from './enums';
 
 export type Program = InferSelectModel<typeof programs>;
 export type ProgramStep = InferSelectModel<typeof programSteps>;
@@ -16,4 +16,6 @@ export interface StepWithExercise {
     durationSeconds: number | null;
     exerciseName: string | null;
     exerciseMetricType: MetricType | null;
+    mediaPath: string | null;
+    mediaType: MediaType | null;
 }

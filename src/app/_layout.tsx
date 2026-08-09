@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useFonts, Orbitron_400Regular, Orbitron_600SemiBold, Orbitron_700Bold } from '@expo-google-fonts/orbitron';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,7 +38,7 @@ function AppTabs() {
                 options={{
                     title: 'Exercices',
                     tabBarIcon: ({ color }) => (
-                        <Text style={{ color, fontSize: 16, fontWeight: '700' }}>E</Text>
+                        <MaterialCommunityIcons name="arm-flex" size={22} color={color} />
                     ),
                 }}
             />
@@ -46,7 +47,7 @@ function AppTabs() {
                 options={{
                     title: 'Programmes',
                     tabBarIcon: ({ color }) => (
-                        <Text style={{ color, fontSize: 16, fontWeight: '700' }}>P</Text>
+                        <MaterialCommunityIcons name="clipboard-list-outline" size={22} color={color} />
                     ),
                 }}
             />

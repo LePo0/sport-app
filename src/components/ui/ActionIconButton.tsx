@@ -1,9 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 
 interface ActionIconButtonProps {
-    icon: string;
+    icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
     onPress?: () => void;
     disabled?: boolean;
     variant?: 'default' | 'danger';
@@ -27,15 +28,15 @@ export function ActionIconButton({
             onPress={onPress}
             disabled={disabled}
         >
-            <Text
+            <MaterialCommunityIcons
+                name={icon}
+                size={18}
                 style={[
                     styles.icon,
                     isDanger && styles.dangerIcon,
                     disabled && styles.disabledIcon,
                 ]}
-            >
-                {icon}
-            </Text>
+            />
         </TouchableOpacity>
     );
 }
@@ -60,8 +61,6 @@ const styles = StyleSheet.create({
     },
     icon: {
         color: colors.textPrimary,
-        fontSize: 16,
-        fontWeight: '700',
     },
     dangerIcon: {
         color: colors.danger,

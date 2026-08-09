@@ -76,7 +76,7 @@ export default function ExercisesListScreen() {
                         </View>
                     </View>
                     <View style={styles.cardActions}>
-                        <ActionIconButton icon="✕" variant="danger" onPress={() => handleDelete(item.id, item.name)} />
+                        <ActionIconButton icon="delete-outline" variant="danger" onPress={() => handleDelete(item.id, item.name)} />
                     </View>
                 </View>
             </ListCard>
