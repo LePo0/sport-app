@@ -10,12 +10,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
-import { glowMd } from '../../theme/glow';
 import { Exercise } from '../../types/exercise';
 import { watchExercises, deleteExerciseById, getProgramsUsingExercise } from '../../db/queries/exerciseDao';
 import { MetricType } from '../../types/enums';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { GlowRing } from '../../components/ui/GlowRing';
+import { ActionIconButton } from '../../components/ui/ActionIconButton';
+import { ListCard } from '../../components/ui/ListCard';
 
 export default function ExercisesListScreen() {
     const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -57,28 +58,28 @@ export default function ExercisesListScreen() {
 
     const renderExerciseItem = ({ item }: { item: Exercise }) => (
         <TouchableOpacity
-            style={styles.exerciseCard}
             onPress={() => handleEditExercise(item.id)}
         >
-            <View style={styles.exerciseContent}>
-                <Text style={styles.exerciseName}>{item.name}</Text>
-                <View style={styles.exerciseDetails}>
-                    <Text style={styles.metricTypeLabel}>
-                        {item.metricType === MetricType.REPS ? 'Répétitions' : 'Durée'}
-                    </Text>
-                    {item.mediaPath && (
-                        <Text style={styles.mediaLabel}>
-                            {item.mediaType === 'image' ? 'Image' : 'Vidéo'}
-                        </Text>
-                    )}
+            <ListCard>
+                <View style={styles.cardHeader}>
+                    <View style={styles.cardMain}>
+                        <Text style={styles.exerciseName}>{item.name}</Text>
+                        <View style={styles.exerciseDetails}>
+                            <Text style={styles.metricTypeLabel}>
+                                {item.metricType === MetricType.REPS ? 'Répétitions' : 'Durée'}
+                            </Text>
+                            {item.mediaPath && (
+                                <Text style={styles.mediaLabel}>
+                                    {item.mediaType === 'image' ? 'Image' : 'Vidéo'}
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+                    <View style={styles.cardActions}>
+                        <ActionIconButton icon="✕" variant="danger" onPress={() => handleDelete(item.id, item.name)} />
+                    </View>
                 </View>
-            </View>
-            <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDelete(item.id, item.name)}
-            >
-                <Text style={styles.deleteButtonText}>✕</Text>
-            </TouchableOpacity>
+            </ListCard>
         </TouchableOpacity>
     );
 
@@ -180,24 +181,19 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 16,
     },
-    exerciseCard: {
-        backgroundColor: colors.surface,
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 12,
+    cardHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.borderAccent,
+        alignItems: 'flex-start',
+        gap: 12,
     },
-    exerciseContent: {
+    cardMain: {
         flex: 1,
     },
     exerciseName: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: colors.textPrimary,
-        marginBottom: 6,
+        marginBottom: 4,
     },
     exerciseDetails: {
         flexDirection: 'row',
@@ -221,13 +217,11 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 4,
     },
-    deleteButton: {
-        padding: 8,
-        marginLeft: 12,
-    },
-    deleteButtonText: {
-        fontSize: 18,
-        color: colors.danger,
+    cardActions: {
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: 'flex-end',
+        paddingTop: 2,
     },
     fab: {
         width: 56,

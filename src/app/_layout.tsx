@@ -1,10 +1,58 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { useFonts, Orbitron_400Regular, Orbitron_600SemiBold, Orbitron_700Bold } from '@expo-google-fonts/orbitron';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatabaseMigrations } from '../hooks/useDatabaseMigrations';
 import { colors } from '../theme/colors';
+
+function AppTabs() {
+    const insets = useSafeAreaInsets();
+
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    backgroundColor: colors.surfaceElevated,
+                    borderTopColor: colors.border,
+                    borderTopWidth: 1,
+                    height: 60 + insets.bottom,
+                    paddingTop: 8,
+                    paddingBottom: Math.max(insets.bottom, 8),
+                },
+                tabBarActiveTintColor: colors.accentPrimary,
+                tabBarInactiveTintColor: colors.textSecondary,
+                tabBarLabelStyle: {
+                    fontSize: 12,
+                    fontWeight: '700',
+                },
+                sceneStyle: {
+                    backgroundColor: colors.background,
+                },
+            }}
+        >
+            <Tabs.Screen
+                name="exercises"
+                options={{
+                    title: 'Exercices',
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ color, fontSize: 16, fontWeight: '700' }}>E</Text>
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="programs"
+                options={{
+                    title: 'Programmes',
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ color, fontSize: 16, fontWeight: '700' }}>P</Text>
+                    ),
+                }}
+            />
+        </Tabs>
+    );
+}
 
 export default function RootLayout() {
     const [fontsLoaded] = useFonts({ Orbitron_400Regular, Orbitron_600SemiBold, Orbitron_700Bold });
@@ -41,7 +89,7 @@ export default function RootLayout() {
 
     return (
         <SafeAreaProvider>
-            <Stack screenOptions={{ headerShown: false }} />
+            <AppTabs />
         </SafeAreaProvider>
     );
 }

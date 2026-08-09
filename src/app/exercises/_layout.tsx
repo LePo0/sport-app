@@ -13,7 +13,10 @@ export default function ExercisesLayout() {
         <Stack screenOptions={{ headerShown: true, headerBackVisible: true, ...headerTheme }}>
             <Stack.Screen
                 name="index"
-                options={{ title: 'Exercices' }}
+                options={{
+                    title: 'Exercices',
+                    headerBackVisible: false,
+                }}
             />
             <Stack.Screen
                 name="[id]"
