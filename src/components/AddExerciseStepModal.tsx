@@ -40,7 +40,7 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
     return (
         <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
             <View style={s.overlay}>
-                <View style={[s.sheet, { paddingBottom: 20 + Math.max(insets.bottom, 12) }] }>
+                <View style={[s.sheet, { paddingBottom: 20 + Math.max(insets.bottom, 12) }]}>
                     <Text style={s.title}>Ajouter un exercice</Text>
 
                     <Text style={s.label}>Choisir</Text>
