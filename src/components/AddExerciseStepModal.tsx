@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Exercise } from '../types/exercise';
 import { MetricType } from '../types/enums';
 import { colors } from '../theme/colors';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Props) {
+    const insets = useSafeAreaInsets();
     const [selected, setSelected] = useState<Exercise | null>(null);
     const [sets, setSets] = useState('');
     const [reps, setReps] = useState('');
@@ -38,7 +40,7 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
     return (
         <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
             <View style={s.overlay}>
-                <View style={s.sheet}>
+                <View style={[s.sheet, { paddingBottom: 20 + Math.max(insets.bottom, 12) }] }>
                     <Text style={s.title}>Ajouter un exercice</Text>
 
                     <Text style={s.label}>Choisir</Text>
@@ -102,7 +104,7 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
 
 const s = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '85%' },
+    sheet: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 20, paddingHorizontal: 20, maxHeight: '85%' },
     title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 16 },
     label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
     list: { maxHeight: 180, marginBottom: 12 },

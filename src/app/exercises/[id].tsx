@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -9,8 +9,10 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ExerciseFormData } from '../../types/exercise';
-import { MetricType } from '../../types/enums';
+import { MediaType, MetricType } from '../../types/enums';
 import {
     findExerciseById,
     insertExercise,
@@ -27,16 +29,18 @@ export default function ExerciseEditScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const router = useRouter();
     const isEditMode = !!id && id !== 'new';
+    const draftExerciseIdRef = useRef(isEditMode && id ? id : createExerciseId());
 
     const [formData, setFormData] = useState<ExerciseFormData>({
         name: '',
         metricType: MetricType.REPS,
-        mediaPath: undefined,
-        mediaType: undefined,
+        mediaPath: null,
+        mediaType: null,
     });
 
     const [isLoading, setIsLoading] = useState(isEditMode);
     const [isSaving, setIsSaving] = useState(false);
+    const [isPickingMedia, setIsPickingMedia] = useState(false);
     const [originalMetricType, setOriginalMetricType] = useState<MetricType | null>(null);
 
     useEffect(() => {
@@ -50,8 +54,8 @@ export default function ExerciseEditScreen() {
                 setFormData({
                     name: exercise.name,
                     metricType: exercise.metricType,
-                    mediaPath: exercise.mediaPath ?? undefined,
-                    mediaType: exercise.mediaType ?? undefined,
+                    mediaPath: exercise.mediaPath ?? null,
+                    mediaType: exercise.mediaType ?? null,
                 });
                 setOriginalMetricType(exercise.metricType);
             } else {
@@ -64,6 +68,81 @@ export default function ExerciseEditScreen() {
             router.back();
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handlePickMedia = async () => {
+        setIsPickingMedia(true);
+        try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permission requise', 'L\'accès à la bibliothèque est nécessaire pour choisir un média.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images', 'videos'],
+                allowsMultipleSelection: false,
+                allowsEditing: false,
+                quality: 1,
+            });
+
+            if (result.canceled || result.assets.length === 0) {
+                return;
+            }
+
+            const asset = result.assets[0];
+            const nextMediaType = resolveMediaType(asset.type, asset.mimeType);
+            if (!nextMediaType) {
+                Alert.alert('Erreur', 'Type de média non pris en charge.');
+                return;
+            }
+
+            const exerciseId = isEditMode && id ? id : draftExerciseIdRef.current;
+            const extension = resolveFileExtension(asset.uri, asset.fileName, asset.mimeType, nextMediaType);
+            const baseName = `exercise_${exerciseId}`;
+            const finalPath = `${MEDIA_DIRECTORY}${baseName}${extension}`;
+            const tempPath = `${MEDIA_DIRECTORY}${baseName}_pending${extension}`;
+
+            await FileSystem.makeDirectoryAsync(MEDIA_DIRECTORY, { intermediates: true });
+            await deleteIfExists(tempPath);
+            await deleteIfExists(finalPath);
+            await FileSystem.copyAsync({ from: asset.uri, to: tempPath });
+
+            if (formData.mediaPath) {
+                await deleteIfExists(formData.mediaPath);
+            }
+
+            await FileSystem.moveAsync({ from: tempPath, to: finalPath });
+
+            setFormData((prev) => ({
+                ...prev,
+                mediaPath: finalPath,
+                mediaType: nextMediaType,
+            }));
+        } catch (error) {
+            Alert.alert('Erreur', 'Impossible de copier le média sélectionné.');
+            console.error(error);
+        } finally {
+            setIsPickingMedia(false);
+        }
+    };
+
+    const handleRemoveMedia = async () => {
+        if (!formData.mediaPath) {
+            setFormData((prev) => ({ ...prev, mediaPath: null, mediaType: null }));
+            return;
+        }
+
+        setIsPickingMedia(true);
+        try {
+            await deleteIfExists(formData.mediaPath);
+            setFormData((prev) => ({ ...prev, mediaPath: null, mediaType: null }));
+        } catch (error) {
+            Alert.alert('Erreur', 'Impossible de supprimer le média.');
+            console.error(error);
+        } finally {
+            setIsPickingMedia(false);
         }
     };
 
@@ -91,7 +170,7 @@ export default function ExerciseEditScreen() {
                 await updateExercise(id, formData);
                 Alert.alert('Succès', 'Exercice mis à jour');
             } else {
-                await insertExercise(formData);
+                await insertExercise(formData, draftExerciseIdRef.current);
                 Alert.alert('Succès', 'Exercice créé');
             }
             router.back();
@@ -145,9 +224,9 @@ export default function ExerciseEditScreen() {
                 <MediaPicker
                     mediaPath={formData.mediaPath}
                     mediaType={formData.mediaType}
-                    onRemove={() =>
-                        setFormData((prev) => ({ ...prev, mediaPath: undefined, mediaType: undefined }))
-                    }
+                    isBusy={isPickingMedia}
+                    onPick={handlePickMedia}
+                    onRemove={handleRemoveMedia}
                 />
             </View>
 
@@ -174,4 +253,57 @@ export default function ExerciseEditScreen() {
             </View>
         </ScrollView>
     );
+}
+
+const MEDIA_DIRECTORY = `${FileSystem.documentDirectory}exercise-media/`;
+
+function createExerciseId(): string {
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+async function deleteIfExists(fileUri: string) {
+    const info = await FileSystem.getInfoAsync(fileUri);
+    if (info.exists) {
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
+    }
+}
+
+function resolveMediaType(assetType: string | null | undefined, mimeType: string | null | undefined): MediaType | null {
+    if (assetType === 'video' || mimeType?.startsWith('video/')) {
+        return MediaType.VIDEO;
+    }
+
+    if (assetType === 'image' || assetType === 'livePhoto' || mimeType?.startsWith('image/')) {
+        return MediaType.IMAGE;
+    }
+
+    return null;
+}
+
+function resolveFileExtension(
+    assetUri: string,
+    fileName: string | null | undefined,
+    mimeType: string | null | undefined,
+    mediaType: MediaType
+): string {
+    const nameSource = fileName ?? assetUri;
+    const matchedExtension = /\.([a-zA-Z0-9]+)(?:\?.*)?$/.exec(nameSource)?.[1]?.toLowerCase();
+    if (matchedExtension) {
+        return `.${matchedExtension}`;
+    }
+
+    switch (mimeType) {
+        case 'image/jpeg':
+            return '.jpg';
+        case 'image/png':
+            return '.png';
+        case 'image/webp':
+            return '.webp';
+        case 'video/quicktime':
+            return '.mov';
+        case 'video/mp4':
+            return '.mp4';
+        default:
+            return mediaType === MediaType.VIDEO ? '.mp4' : '.jpg';
+    }
 }

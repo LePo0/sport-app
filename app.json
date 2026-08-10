@@ -27,7 +27,17 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autoriser $(PRODUCT_NAME) a acceder a votre bibliotheque pour associer un media a un exercice.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-image",
+      "expo-video"
     ],
     "extra": {
       "router": {},

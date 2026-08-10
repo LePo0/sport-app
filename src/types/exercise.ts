@@ -18,6 +18,6 @@ export type ExerciseInsert = InferInsertModel<typeof exercises>;
 export type ExerciseFormData = {
     name: string;
     metricType: MetricType;
-    mediaPath?: string;
-    mediaType?: MediaType;
+    mediaPath: string | null;
+    mediaType: MediaType | null;
 };

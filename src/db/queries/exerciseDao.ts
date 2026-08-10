@@ -54,8 +54,8 @@ export function watchExercises(callback: (exercises: Exercise[]) => void): () =>
  * Insère un nouvel exercice
  * Retourne l'id généré
  */
-export async function insertExercise(data: ExerciseFormData): Promise<string> {
-    const id = generateId();
+export async function insertExercise(data: ExerciseFormData, idOverride?: string): Promise<string> {
+    const id = idOverride ?? generateId();
     const insertData = {
         ...data,
         id,
