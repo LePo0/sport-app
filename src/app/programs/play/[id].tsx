@@ -9,6 +9,7 @@ import {
     Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAudioPlayer } from 'expo-audio';
 import { colors } from '../../../theme/colors';
 import { getProgramById } from '../../../db/queries/programDao';
 import { getStepsForProgram } from '../../../db/queries/programStepDao';
@@ -32,6 +33,7 @@ export default function ProgramPlayerScreen() {
     const [placementTargetIndex, setPlacementTargetIndex] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSavingSession, setIsSavingSession] = useState(false);
+    const whistlePlayer = useAudioPlayer(require('../../../../assets/sounds/whistle.mp3'));
 
     const currentStep = sequence[currentIndex] ?? null;
     const isSequenceFinished = sequence.length > 0 && currentIndex >= sequence.length;
@@ -106,9 +108,18 @@ export default function ProgramPlayerScreen() {
         }
 
         setRemainingSeconds(stepDuration);
+        const isTimedExerciseStep =
+            currentStep.stepType === StepType.EXERCISE &&
+            currentStep.exerciseMetricType === MetricType.TIME;
+
         intervalRef.current = setInterval(() => {
             setRemainingSeconds((prev) => {
                 if (prev === null) return null;
+                if (prev === 1 && isTimedExerciseStep) {
+                    whistlePlayer.seekTo(0);
+                    whistlePlayer.play();
+                    return 0;
+                }
                 return prev > 0 ? prev - 1 : 0;
             });
         }, 1000);
