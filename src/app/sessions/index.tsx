@@ -1,10 +1,17 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextStyle, ViewStyle } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { colors } from '../../theme/colors';
 import { getSessionDates, getSessionsForDate, SessionForDateItem } from '../../db/queries/sessionDao';
 import { ListCard } from '../../components/ui/ListCard';
+
+type CalendarMark = {
+    customStyles?: {
+        container?: ViewStyle;
+        text?: TextStyle;
+    };
+};
 
 function formatDuration(totalSeconds: number): string {
     const hours = Math.floor(totalSeconds / 3600);
@@ -41,21 +48,54 @@ export default function CalendarScreen() {
     );
 
     const markedDates = useMemo(() => {
-        const marks: Record<string, { marked?: boolean; dotColor?: string; selected?: boolean; selectedColor?: string }> = {};
+        const marks: Record<string, CalendarMark> = {};
 
         for (const date of sessionDates) {
             marks[date] = {
-                marked: true,
-                dotColor: colors.accentPrimary,
+                customStyles: {
+                    container: {
+                        backgroundColor: colors.accentPrimary,
+                        borderRadius: 999,
+                    },
+                    text: {
+                        color: colors.background,
+                        fontWeight: '700',
+                    },
+                },
             };
         }
 
         if (selectedDate) {
-            marks[selectedDate] = {
-                ...(marks[selectedDate] ?? {}),
-                selected: true,
-                selectedColor: colors.surfaceElevated,
-            };
+            const hasSession = sessionDates.includes(selectedDate);
+            marks[selectedDate] = hasSession
+                ? {
+                      customStyles: {
+                          container: {
+                              backgroundColor: colors.accentSecondary,
+                              borderRadius: 999,
+                              borderWidth: 2,
+                              borderColor: colors.accentPrimary,
+                          },
+                          text: {
+                              color: colors.textPrimary,
+                              fontWeight: '800',
+                          },
+                      },
+                  }
+                : {
+                      customStyles: {
+                          container: {
+                              backgroundColor: colors.surfaceElevated,
+                              borderRadius: 999,
+                              borderWidth: 1,
+                              borderColor: colors.borderAccent,
+                          },
+                          text: {
+                              color: colors.textPrimary,
+                              fontWeight: '700',
+                          },
+                      },
+                  };
         }
 
         return marks;
@@ -84,6 +124,7 @@ export default function CalendarScreen() {
                 <Calendar
                     onDayPress={handleDayPress}
                     markedDates={markedDates}
+                    markingType="custom"
                     theme={{
                         calendarBackground: colors.surface,
                         textSectionTitleColor: colors.textSecondary,
