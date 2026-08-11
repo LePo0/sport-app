@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function AddRestStepModal({ visible, onAdd, onCancel }: Props) {
+    const insets = useSafeAreaInsets();
     const [duration, setDuration] = useState('');
 
     useEffect(() => { if (!visible) setDuration(''); }, [visible]);
@@ -19,7 +21,7 @@ export function AddRestStepModal({ visible, onAdd, onCancel }: Props) {
     return (
         <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
             <View style={s.overlay}>
-                <View style={s.sheet}>
+                <View style={[s.sheet, { paddingBottom: 20 + Math.max(insets.bottom, 12) }]}>
                     <Text style={s.title}>Ajouter une pause</Text>
                     <Text style={s.label}>Durée (secondes)</Text>
                     <TextInput
@@ -47,11 +49,18 @@ export function AddRestStepModal({ visible, onAdd, onCancel }: Props) {
 
 const s = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20 },
+    sheet: {
+        backgroundColor: colors.surfaceElevated,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        minHeight: 240,
+    },
     title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 16 },
     label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
     input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary, marginBottom: 20 },
-    actions: { flexDirection: 'row', gap: 12 },
+    actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
     cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
     cancelLabel: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
     addBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.accentPrimary, alignItems: 'center' },
