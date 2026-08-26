@@ -9,6 +9,7 @@ export enum MetricType {
 
 export enum StepType {
     EXERCISE = 'exercise',
+    /** @deprecated legacy uniquement (anciennes sessionSteps) ; plus jamais créé depuis l'éditeur de programme */
     REST = 'rest',
 }
 

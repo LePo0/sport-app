@@ -14,6 +14,8 @@ export interface StepWithExercise {
     sets: number | null;
     reps: number | null;
     durationSeconds: number | null;
+    restAfterSetSeconds: number;
+    restAfterExerciseSeconds: number;
     exerciseName: string | null;
     exerciseMetricType: MetricType | null;
     mediaPath: string | null;

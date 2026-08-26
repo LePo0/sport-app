@@ -19,6 +19,8 @@ export async function getStepsForProgram(programId: string): Promise<StepWithExe
             sets: programSteps.sets,
             reps: programSteps.reps,
             durationSeconds: programSteps.durationSeconds,
+            restAfterSetSeconds: programSteps.restAfterSetSeconds,
+            restAfterExerciseSeconds: programSteps.restAfterExerciseSeconds,
             exerciseName: exercises.name,
             exerciseMetricType: exercises.metricType,
             mediaPath: exercises.mediaPath,
@@ -38,24 +40,14 @@ export async function addExerciseStep(
     orderIndex: number,
     sets: number | null,
     reps: number | null,
-    durationSeconds: number | null
+    durationSeconds: number | null,
+    restAfterSetSeconds: number = 0,
+    restAfterExerciseSeconds: number = 0
 ): Promise<string> {
     const id = generateId();
     await db.insert(programSteps).values({
         id, programId, stepType: StepType.EXERCISE, exerciseId, orderIndex, sets, reps, durationSeconds,
-    });
-    return id;
-}
-
-export async function addRestStep(
-    programId: string,
-    orderIndex: number,
-    durationSeconds: number
-): Promise<string> {
-    const id = generateId();
-    await db.insert(programSteps).values({
-        id, programId, stepType: StepType.REST, exerciseId: null,
-        orderIndex, sets: null, reps: null, durationSeconds,
+        restAfterSetSeconds, restAfterExerciseSeconds,
     });
     return id;
 }
@@ -101,9 +93,11 @@ export async function updateExerciseStepValues(
     stepId: string,
     sets: number | null,
     reps: number | null,
-    durationSeconds: number | null
+    durationSeconds: number | null,
+    restAfterSetSeconds: number = 0,
+    restAfterExerciseSeconds: number = 0
 ): Promise<void> {
-    await db.update(programSteps).set({ sets, reps, durationSeconds }).where(eq(programSteps.id, stepId));
+    await db.update(programSteps).set({ sets, reps, durationSeconds, restAfterSetSeconds, restAfterExerciseSeconds }).where(eq(programSteps.id, stepId));
 }
 
 export async function replaceProgramSteps(programId: string, steps: StepWithExercise[]): Promise<void> {
@@ -121,6 +115,8 @@ export async function replaceProgramSteps(programId: string, steps: StepWithExer
             sets: step.sets,
             reps: step.reps,
             durationSeconds: step.durationSeconds,
+            restAfterSetSeconds: step.restAfterSetSeconds,
+            restAfterExerciseSeconds: step.restAfterExerciseSeconds,
         }))
     );
 }

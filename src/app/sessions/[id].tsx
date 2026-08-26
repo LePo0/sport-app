@@ -82,6 +82,7 @@ export default function SessionDetailScreen() {
                 <Text style={s.programName}>{session.programName}</Text>
                 <Text style={s.meta}>{formatDate(session.date)}</Text>
                 <Text style={s.duration}>{formatDuration(session.totalDurationSeconds)}</Text>
+                <Text style={s.meta}>{session.rounds} tour{session.rounds > 1 ? 's' : ''}{session.restBetweenRoundsSeconds > 0 ? ` • repos entre tours ${session.restBetweenRoundsSeconds}s` : ''}</Text>
             </ListCard>
 
             <Text style={s.sectionTitle}>Étapes jouées</Text>
@@ -100,6 +101,13 @@ export default function SessionDetailScreen() {
                                     ? `${step.sets ?? '?'} × ${step.reps ?? '?'} rép.`
                                     : `${step.durationSeconds ?? '?'} s`}
                             </Text>
+                            {(!!step.restAfterSetSeconds || !!step.restAfterExerciseSeconds) && (
+                                <Text style={s.stepDetail}>
+                                    {step.restAfterSetSeconds ? `Repos série ${step.restAfterSetSeconds}s` : null}
+                                    {step.restAfterSetSeconds && step.restAfterExerciseSeconds ? ' • ' : null}
+                                    {step.restAfterExerciseSeconds ? `Repos exercice ${step.restAfterExerciseSeconds}s` : null}
+                                </Text>
+                            )}
                         </>
                     )}
                 </ListCard>
@@ -125,6 +133,13 @@ export default function SessionDetailScreen() {
                                     ? `${step.sets ?? '?'} × ${step.reps ?? '?'} rép.`
                                     : `${step.durationSeconds ?? '?'} s`}
                             </Text>
+                            {(step.restAfterSetSeconds > 0 || step.restAfterExerciseSeconds > 0) && (
+                                <Text style={s.stepDetail}>
+                                    {step.restAfterSetSeconds > 0 ? `Repos série ${step.restAfterSetSeconds}s` : null}
+                                    {step.restAfterSetSeconds > 0 && step.restAfterExerciseSeconds > 0 ? ' • ' : null}
+                                    {step.restAfterExerciseSeconds > 0 ? `Repos exercice ${step.restAfterExerciseSeconds}s` : null}
+                                </Text>
+                            )}
                         </>
                     )}
                 </ListCard>

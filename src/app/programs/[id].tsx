@@ -15,7 +15,6 @@ import {
     getStepsForProgram, replaceProgramSteps,
 } from '../../db/queries/programStepDao';
 import { AddExerciseStepModal } from '../../components/AddExerciseStepModal';
-import { AddRestStepModal } from '../../components/AddRestStepModal';
 import { HeaderBackButton } from '../../components/ui/HeaderBackButton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
@@ -28,16 +27,17 @@ export default function ProgramFormScreen() {
 
     const [name, setName] = useState('');
     const [rounds, setRounds] = useState('1');
+    const [restBetweenRounds, setRestBetweenRounds] = useState('');
     const [programId, setProgramId] = useState<string | null>(isEditMode ? id! : null);
     const [steps, setSteps] = useState<StepWithExercise[]>([]);
     const [allExercises, setAllExercises] = useState<Exercise[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [showExerciseModal, setShowExerciseModal] = useState(false);
-    const [showRestModal, setShowRestModal] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [cancelTargetPath, setCancelTargetPath] = useState('/programs');
     const [initialName, setInitialName] = useState('');
     const [initialRounds, setInitialRounds] = useState('1');
+    const [initialRestBetweenRounds, setInitialRestBetweenRounds] = useState('');
     const [initialSteps, setInitialSteps] = useState<StepWithExercise[]>([]);
 
     const loadSteps = useCallback(async (pid: string) => {
@@ -58,8 +58,10 @@ export default function ProgramFormScreen() {
                 if (!program) return;
                 setName(program.name);
                 setRounds(String(program.rounds));
+                setRestBetweenRounds(String(program.restBetweenRoundsSeconds));
                 setInitialName(program.name);
                 setInitialRounds(String(program.rounds));
+                setInitialRestBetweenRounds(String(program.restBetweenRoundsSeconds));
             })
             .catch(console.error);
     }, [id, isEditMode]);
@@ -88,6 +90,8 @@ export default function ProgramFormScreen() {
             sets: step.sets,
             reps: step.reps,
             durationSeconds: step.durationSeconds,
+            restAfterSetSeconds: step.restAfterSetSeconds,
+            restAfterExerciseSeconds: step.restAfterExerciseSeconds,
         }))
     );
 
@@ -112,13 +116,14 @@ export default function ProgramFormScreen() {
             Alert.alert('Erreur', 'Le nombre de tours doit être supérieur à 0');
             return;
         }
+        const restBetween = parseInt(restBetweenRounds) || 0;
         setIsSaving(true);
         try {
             if (isEditMode && id) {
-                await updateProgram(id, name.trim(), r);
+                await updateProgram(id, name.trim(), r, restBetween);
                 await replaceProgramSteps(id, persistableSteps(id));
             } else {
-                const newId = await createProgram(name.trim(), r);
+                const newId = await createProgram(name.trim(), r, restBetween);
                 setProgramId(newId);
                 await replaceProgramSteps(newId, persistableSteps(newId));
             }
@@ -132,7 +137,8 @@ export default function ProgramFormScreen() {
     };
 
     const handleAddExercise = async (
-        exerciseId: string, sets: number | null, reps: number | null, durationSeconds: number | null
+        exerciseId: string, sets: number | null, reps: number | null, durationSeconds: number | null,
+        restAfterSetSeconds: number, restAfterExerciseSeconds: number
     ) => {
         setShowExerciseModal(false);
         const exercise = allExercises.find((item) => item.id === exerciseId);
@@ -149,31 +155,12 @@ export default function ProgramFormScreen() {
                 sets,
                 reps,
                 durationSeconds,
+                restAfterSetSeconds,
+                restAfterExerciseSeconds,
                 exerciseName: exercise.name,
                 exerciseMetricType: exercise.metricType,
                 mediaPath: exercise.mediaPath ?? null,
                 mediaType: exercise.mediaType ?? null,
-            },
-        ]);
-    };
-
-    const handleAddRest = async (durationSeconds: number) => {
-        setShowRestModal(false);
-        setSteps((prev) => [
-            ...prev,
-            {
-                id: `local_step_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                programId: programId ?? 'draft_program',
-                stepType: StepType.REST,
-                exerciseId: null,
-                orderIndex: prev.length,
-                sets: null,
-                reps: null,
-                durationSeconds,
-                exerciseName: null,
-                exerciseMetricType: null,
-                mediaPath: null,
-                mediaType: null,
             },
         ]);
     };
@@ -200,7 +187,7 @@ export default function ProgramFormScreen() {
     };
 
     const hasStepChanges = serializeSteps(steps) !== serializeSteps(initialSteps);
-    const hasMetadataChanges = name !== initialName || rounds !== initialRounds;
+    const hasMetadataChanges = name !== initialName || rounds !== initialRounds || restBetweenRounds !== initialRestBetweenRounds;
     const hasUnsavedChanges = hasStepChanges || hasMetadataChanges;
 
     const discardChangesAndExit = async (targetPath = '/programs') => {
@@ -238,7 +225,7 @@ export default function ProgramFormScreen() {
             unsubscribeBeforeRemove();
             unsubscribeTabPress?.();
         };
-    }, [navigation, isSaving, hasUnsavedChanges, name, rounds, steps, initialName, initialRounds, initialSteps]);
+    }, [navigation, isSaving, hasUnsavedChanges, name, rounds, restBetweenRounds, steps, initialName, initialRounds, initialRestBetweenRounds, initialSteps]);
 
     return (
         <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
@@ -275,6 +262,13 @@ export default function ProgramFormScreen() {
                     keyboardType="numeric" placeholderTextColor={colors.textSecondary}
                 />
             </View>
+            <View style={s.fieldGroup}>
+                <Text style={s.label}>Repos entre tours (secondes)</Text>
+                <TextInput
+                    style={[s.input, s.inputShort]} value={restBetweenRounds} onChangeText={setRestBetweenRounds}
+                    keyboardType="numeric" placeholder="90" placeholderTextColor={colors.textSecondary}
+                />
+            </View>
 
             {/* Steps */}
             <Text style={s.sectionTitle}>Séquence</Text>
@@ -292,6 +286,13 @@ export default function ProgramFormScreen() {
                                         ? `${step.sets ?? '?'} × ${step.reps ?? '?'} rép.`
                                         : `${step.durationSeconds ?? '?'} s`}
                                 </Text>
+                                {(step.restAfterSetSeconds > 0 || step.restAfterExerciseSeconds > 0) && (
+                                    <Text style={s.stepDetail}>
+                                        {step.restAfterSetSeconds > 0 ? `Repos série ${step.restAfterSetSeconds}s` : null}
+                                        {step.restAfterSetSeconds > 0 && step.restAfterExerciseSeconds > 0 ? ' • ' : null}
+                                        {step.restAfterExerciseSeconds > 0 ? `Repos exercice ${step.restAfterExerciseSeconds}s` : null}
+                                    </Text>
+                                )}
                             </>
                         ) : (
                             <>
@@ -324,9 +325,6 @@ export default function ProgramFormScreen() {
             <View style={s.addRow}>
                 <TouchableOpacity style={s.addBtn} onPress={() => setShowExerciseModal(true)}>
                     <Text style={s.addBtnText}>+ Exercice</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.addBtn, s.addBtnSecondary]} onPress={() => setShowRestModal(true)}>
-                    <Text style={[s.addBtnText, s.addBtnTextSecondary]}>+ Pause</Text>
                 </TouchableOpacity>
             </View>
 
@@ -363,11 +361,6 @@ export default function ProgramFormScreen() {
                 exercises={allExercises}
                 onAdd={handleAddExercise}
                 onCancel={() => setShowExerciseModal(false)}
-            />
-            <AddRestStepModal
-                visible={showRestModal}
-                onAdd={handleAddRest}
-                onCancel={() => setShowRestModal(false)}
             />
         </ScrollView>
     );

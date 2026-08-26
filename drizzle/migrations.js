@@ -66,10 +66,27 @@ CREATE TABLE \`sessionSteps\` (
 	FOREIGN KEY (\`sessionId\`) REFERENCES \`sessions\`(\`id\`) ON UPDATE no action ON DELETE cascade
 );`;
 
+const m0002 = `ALTER TABLE \`programSteps\` ADD \`restAfterSetSeconds\` integer DEFAULT 0 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`programSteps\` ADD \`restAfterExerciseSeconds\` integer DEFAULT 0 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`programs\` ADD \`restBetweenRoundsSeconds\` integer DEFAULT 0 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`rounds\` integer DEFAULT 1 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`restBetweenRoundsSeconds\` integer DEFAULT 0 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE \`sessionSteps\` ADD \`restAfterSetSeconds\` integer;
+--> statement-breakpoint
+ALTER TABLE \`sessionSteps\` ADD \`restAfterExerciseSeconds\` integer;
+--> statement-breakpoint
+DELETE FROM \`programSteps\` WHERE \`stepType\` = 'rest';`;
+
 export default {
-  journal,
-  migrations: {
-    m0000,
-    m0001
-  }
+	journal,
+	migrations: {
+		m0000,
+		m0001,
+		m0002
+	}
 }

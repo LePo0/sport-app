@@ -7,27 +7,27 @@ function generateId(): string {
     return `prog_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
-export async function createProgram(name: string, rounds: number): Promise<string> {
+export async function createProgram(name: string, rounds: number, restBetweenRoundsSeconds: number = 0): Promise<string> {
     const id = generateId();
-    await db.insert(programs).values({ id, name, rounds, createdAt: Date.now() });
+    await db.insert(programs).values({ id, name, rounds, restBetweenRoundsSeconds, createdAt: Date.now() });
     return id;
 }
 
-export async function updateProgram(id: string, name: string, rounds: number): Promise<void> {
-    await db.update(programs).set({ name, rounds }).where(eq(programs.id, id));
+export async function updateProgram(id: string, name: string, rounds: number, restBetweenRoundsSeconds: number = 0): Promise<void> {
+    await db.update(programs).set({ name, rounds, restBetweenRoundsSeconds }).where(eq(programs.id, id));
 }
 
-export async function getAllPrograms(): Promise<{ id: string; name: string; rounds: number; createdAt: number }[]> {
+export async function getAllPrograms(): Promise<{ id: string; name: string; rounds: number; restBetweenRoundsSeconds: number; createdAt: number }[]> {
     return db.select().from(programs).all();
 }
 
-export async function getProgramById(id: string): Promise<{ id: string; name: string; rounds: number; createdAt: number } | null> {
+export async function getProgramById(id: string): Promise<{ id: string; name: string; rounds: number; restBetweenRoundsSeconds: number; createdAt: number } | null> {
     const result = await db.select().from(programs).where(eq(programs.id, id)).get();
     return result || null;
 }
 
 export function watchPrograms(
-    callback: (programs: { id: string; name: string; rounds: number; createdAt: number }[]) => void
+    callback: (programs: { id: string; name: string; rounds: number; restBetweenRoundsSeconds: number; createdAt: number }[]) => void
 ): () => void {
     getAllPrograms().then(callback).catch(console.error);
 

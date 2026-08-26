@@ -11,6 +11,8 @@ export interface SessionStepInput {
     sets: number | null;
     reps: number | null;
     durationSeconds: number | null;
+    restAfterSetSeconds: number | null;
+    restAfterExerciseSeconds: number | null;
 }
 
 function generateId(): string {
@@ -22,6 +24,8 @@ export async function createSession(
     programName: string,
     date: Date,
     totalDurationSeconds: number,
+    rounds: number,
+    restBetweenRoundsSeconds: number,
     steps: SessionStepInput[]
 ): Promise<string> {
     const id = generateId();
@@ -34,6 +38,8 @@ export async function createSession(
             programName,
             date: date.getTime(),
             totalDurationSeconds,
+            rounds,
+            restBetweenRoundsSeconds,
         });
 
         if (steps.length > 0) {
@@ -46,6 +52,8 @@ export async function createSession(
                     sets: step.sets,
                     reps: step.reps,
                     durationSeconds: step.durationSeconds,
+                    restAfterSetSeconds: step.restAfterSetSeconds,
+                    restAfterExerciseSeconds: step.restAfterExerciseSeconds,
                 }))
             );
         }
@@ -65,6 +73,8 @@ export async function getSessionById(sessionId: string): Promise<{
     programName: string;
     date: number;
     totalDurationSeconds: number;
+    rounds: number;
+    restBetweenRoundsSeconds: number;
 } | null> {
     const result = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
     return result || null;
@@ -124,6 +134,8 @@ export async function getSessionDetail(sessionId: string): Promise<{
     programName: string;
     date: number;
     totalDurationSeconds: number;
+    rounds: number;
+    restBetweenRoundsSeconds: number;
 } | null> {
     const row = await db
         .select({
@@ -132,6 +144,8 @@ export async function getSessionDetail(sessionId: string): Promise<{
             programName: sessions.programName,
             date: sessions.date,
             totalDurationSeconds: sessions.totalDurationSeconds,
+            rounds: sessions.rounds,
+            restBetweenRoundsSeconds: sessions.restBetweenRoundsSeconds,
         })
         .from(sessions)
         .where(eq(sessions.id, sessionId))

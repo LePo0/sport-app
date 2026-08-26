@@ -14,19 +14,28 @@ import { colors } from '../../../theme/colors';
 import { getProgramById } from '../../../db/queries/programDao';
 import { getStepsForProgram } from '../../../db/queries/programStepDao';
 import { createSession } from '../../../db/queries/sessionDao';
-import { MediaType, MetricType, StepType } from '../../../types/enums';
+import { MediaType, MetricType } from '../../../types/enums';
 import { StepWithExercise } from '../../../types/program';
+import { buildRoundActions, buildPlayerSequence, PlayerAction } from '../../../services/programSequence';
+
+const PLACEMENT_SECONDS = 10;
+const CLOCK_TIC_GAP_MS = 50;
 
 export default function ProgramPlayerScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const router = useRouter();
     const sessionStartTimeRef = useRef(Date.now());
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const clockTicTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const clockTicSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+    const isCountdownActiveRef = useRef(false);
 
     const [programId, setProgramId] = useState<string | null>(id ?? null);
     const [programName, setProgramName] = useState('');
+    const [restBetweenRoundsSeconds, setRestBetweenRoundsSeconds] = useState(0);
+    const [playedRounds, setPlayedRounds] = useState(1);
     const [baseSteps, setBaseSteps] = useState<StepWithExercise[]>([]);
-    const [sequence, setSequence] = useState<StepWithExercise[]>([]);
+    const [sequence, setSequence] = useState<PlayerAction[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
     const [isPlacementPhase, setIsPlacementPhase] = useState(false);
@@ -34,8 +43,9 @@ export default function ProgramPlayerScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSavingSession, setIsSavingSession] = useState(false);
     const whistlePlayer = useAudioPlayer(require('../../../../assets/sounds/whistle.mp3'));
+    const clockTicPlayer = useAudioPlayer(require('../../../../assets/sounds/clock-ticking.mp3'));
 
-    const currentStep = sequence[currentIndex] ?? null;
+    const currentAction = sequence[currentIndex] ?? null;
     const isSequenceFinished = sequence.length > 0 && currentIndex >= sequence.length;
 
     useEffect(() => {
@@ -53,9 +63,10 @@ export default function ProgramPlayerScreen() {
                 if (program) {
                     setProgramId(program.id);
                     setProgramName(program.name);
-                    const builtSequence = Array.from({ length: program.rounds }, () => steps).flat();
+                    setRestBetweenRoundsSeconds(program.restBetweenRoundsSeconds);
+                    setPlayedRounds(program.rounds);
                     setBaseSteps(steps);
-                    setSequence(builtSequence);
+                    setSequence(buildPlayerSequence(steps, program.rounds, program.restBetweenRoundsSeconds));
                 }
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -72,9 +83,10 @@ export default function ProgramPlayerScreen() {
 
     useEffect(() => {
         clearTimer();
+        stopClockTicLoop();
 
         if (isPlacementPhase) {
-            setRemainingSeconds(10);
+            setRemainingSeconds(PLACEMENT_SECONDS);
             intervalRef.current = setInterval(() => {
                 setRemainingSeconds((prev) => {
                     if (prev === null) return null;
@@ -96,38 +108,47 @@ export default function ProgramPlayerScreen() {
             };
         }
 
-        if (!currentStep || isSequenceFinished) {
+        if (!currentAction || isSequenceFinished) {
             setRemainingSeconds(null);
             return;
         }
 
-        const stepDuration = getStepDuration(currentStep);
-        if (stepDuration === null) {
+        const isTimedExerciseSet = currentAction.kind === 'exercise-set'
+            && currentAction.step.exerciseMetricType === MetricType.TIME;
+        const isRest = currentAction.kind === 'rest';
+
+        if (!isTimedExerciseSet && !isRest) {
             setRemainingSeconds(null);
             return;
         }
 
-        setRemainingSeconds(stepDuration);
-        const isTimedExerciseStep =
-            currentStep.stepType === StepType.EXERCISE &&
-            currentStep.exerciseMetricType === MetricType.TIME;
+        const duration = currentAction.kind === 'exercise-set'
+            ? currentAction.step.durationSeconds ?? 0
+            : currentAction.durationSeconds;
+
+        setRemainingSeconds(duration);
+
+        if (isTimedExerciseSet) {
+            safeAudioCall(() => { whistlePlayer.seekTo(0); whistlePlayer.play(); });
+            // startClockTicLoop(); // désactivé temporairement
+        }
 
         intervalRef.current = setInterval(() => {
             setRemainingSeconds((prev) => {
                 if (prev === null) return null;
-                if (prev === 1 && isTimedExerciseStep) {
-                    whistlePlayer.seekTo(0);
-                    whistlePlayer.play();
-                    return 0;
+                const next = prev > 0 ? prev - 1 : 0;
+                if (isTimedExerciseSet && next === 0) {
+                    stopClockTicLoop();
                 }
-                return prev > 0 ? prev - 1 : 0;
+                return next;
             });
         }, 1000);
 
         return () => {
             clearTimer();
+            if (isTimedExerciseSet) stopClockTicLoop();
         };
-    }, [currentIndex, currentStep, isSequenceFinished, isPlacementPhase, placementTargetIndex]);
+    }, [currentIndex, currentAction, isSequenceFinished, isPlacementPhase, placementTargetIndex]);
 
     const elapsedSeconds = useMemo(
         () => Math.round((Date.now() - sessionStartTimeRef.current) / 1000),
@@ -141,10 +162,41 @@ export default function ProgramPlayerScreen() {
         }
     }
 
-    function getStepDuration(step: StepWithExercise): number | null {
-        if (step.stepType === StepType.REST) return step.durationSeconds ?? null;
-        if (!step.exerciseName || step.exerciseMetricType !== MetricType.TIME) return null;
-        return step.durationSeconds ?? null;
+    // Le player natif peut déjà être libéré si l'écran a été quitté entre-temps
+    function safeAudioCall(fn: () => void) {
+        try {
+            fn();
+        } catch {
+            // ignoré
+        }
+    }
+
+    function stopClockTicLoop() {
+        isCountdownActiveRef.current = false;
+        if (clockTicTimeoutRef.current) {
+            clearTimeout(clockTicTimeoutRef.current);
+            clockTicTimeoutRef.current = null;
+        }
+        if (clockTicSubscriptionRef.current) {
+            clockTicSubscriptionRef.current.remove();
+            clockTicSubscriptionRef.current = null;
+        }
+        safeAudioCall(() => clockTicPlayer.pause());
+    }
+
+    // Joue le clock-tic, attend la fin de la lecture puis patiente CLOCK_TIC_GAP_MS avant de rejouer
+    function startClockTicLoop() {
+        isCountdownActiveRef.current = true;
+        clockTicSubscriptionRef.current = clockTicPlayer.addListener('playbackStatusUpdate', (status) => {
+            if (status.didJustFinish && isCountdownActiveRef.current) {
+                clockTicTimeoutRef.current = setTimeout(() => {
+                    if (isCountdownActiveRef.current) {
+                        safeAudioCall(() => { clockTicPlayer.seekTo(0); clockTicPlayer.play(); });
+                    }
+                }, CLOCK_TIC_GAP_MS);
+            }
+        });
+        safeAudioCall(() => { clockTicPlayer.seekTo(0); clockTicPlayer.play(); });
     }
 
     function formatDuration(totalSeconds: number): string {
@@ -165,8 +217,13 @@ export default function ProgramPlayerScreen() {
             return;
         }
 
-        setPlacementTargetIndex(nextIndex);
-        setIsPlacementPhase(true);
+        const nextAction = sequence[nextIndex];
+        if (nextAction.kind === 'exercise-set') {
+            setPlacementTargetIndex(nextIndex);
+            setIsPlacementPhase(true);
+        } else {
+            setCurrentIndex(nextIndex);
+        }
     }
 
     function handleSkipPlacement() {
@@ -205,13 +262,17 @@ export default function ProgramPlayerScreen() {
                 programName,
                 new Date(),
                 elapsedSeconds,
-                sequence.map((step, index) => ({
+                playedRounds,
+                restBetweenRoundsSeconds,
+                baseSteps.map((step, index) => ({
                     stepType: step.stepType,
-                    exerciseName: step.stepType === StepType.EXERCISE ? step.exerciseName : null,
+                    exerciseName: step.exerciseName,
                     orderIndex: index,
                     sets: step.sets,
                     reps: step.reps,
                     durationSeconds: step.durationSeconds,
+                    restAfterSetSeconds: step.restAfterSetSeconds,
+                    restAfterExerciseSeconds: step.restAfterExerciseSeconds,
                 }))
             );
             clearTimer();
@@ -230,8 +291,8 @@ export default function ProgramPlayerScreen() {
 
     function handleAddAnotherRound() {
         if (baseSteps.length === 0) return;
-        setSequence((prev) => [...prev, ...baseSteps]);
-        setCurrentIndex((prev) => prev);
+        setSequence((prev) => [...prev, ...buildRoundActions(baseSteps, playedRounds + 1)]);
+        setPlayedRounds((prev) => prev + 1);
     }
 
     if (isLoading) {
@@ -294,15 +355,26 @@ export default function ProgramPlayerScreen() {
         );
     }
 
+    // Action de référence pour l'affichage : le set en cours, ou le prochain set
+    // pendant un placement/repos (pour annoncer l'exercice suivant et sa position)
+    const referenceAction: Extract<PlayerAction, { kind: 'exercise-set' }> | null = isPlacementPhase
+        ? (placementTargetIndex !== null ? (sequence[placementTargetIndex] as Extract<PlayerAction, { kind: 'exercise-set' }>) : null)
+        : currentAction?.kind === 'exercise-set'
+            ? currentAction
+            : currentAction?.kind === 'rest'
+                ? (sequence[currentIndex + 1] as Extract<PlayerAction, { kind: 'exercise-set' }> | undefined) ?? null
+                : null;
+    const placementNextExerciseName = referenceAction?.step.exerciseName ?? null;
+
     return (
         <View style={s.container}>
             <View style={s.headerRow}>
                 <View>
                     <Text style={s.headerLabel}>{programName}</Text>
                     <Text style={s.progressLabel}>
-                        {isPlacementPhase
-                            ? `Placement avant étape ${(placementTargetIndex ?? 0) + 1} / ${sequence.length}`
-                            : `Étape ${currentIndex + 1} / ${sequence.length}`}
+                        {referenceAction
+                            ? `Tour ${referenceAction.round} / ${playedRounds} · Exercice ${referenceAction.exerciseIndex} / ${referenceAction.totalExercises} · Série ${referenceAction.setIndex + 1} / ${referenceAction.totalSets}`
+                            : ''}
                     </Text>
                 </View>
                 <TouchableOpacity style={s.quitGhostButton} onPress={handleQuit}>
@@ -317,28 +389,35 @@ export default function ProgramPlayerScreen() {
                         <Text style={s.stepTitle}>Préparez la suite</Text>
                         <Text style={s.timerValue}>{String(remainingSeconds ?? 0)}</Text>
                         <Text style={s.timerLabel}>secondes</Text>
+                        {placementNextExerciseName ? (
+                            <Text style={s.nextLabel}>Prochain : {placementNextExerciseName}</Text>
+                        ) : null}
                     </>
-                ) : currentStep?.stepType === StepType.REST ? (
+                ) : currentAction?.kind === 'rest' ? (
                     <>
-                        <Text style={s.stepTypeLabel}>Pause</Text>
+                        <Text style={s.stepTypeLabel}>Repos</Text>
                         <Text style={s.stepTitle}>Récupération</Text>
                         <Text style={s.timerValue}>{String(remainingSeconds ?? 0)}</Text>
                         <Text style={s.timerLabel}>secondes</Text>
+                        {currentAction.nextExerciseName ? (
+                            <Text style={s.nextLabel}>Prochain : {currentAction.nextExerciseName}</Text>
+                        ) : null}
                     </>
-                ) : currentStep?.exerciseName ? (
+                ) : currentAction?.kind === 'exercise-set' && currentAction.step.exerciseName ? (
                     <>
                         <Text style={s.stepTypeLabel}>Exercice</Text>
-                        <Text style={s.stepTitle}>{currentStep.exerciseName}</Text>
-                        {currentStep.mediaPath && currentStep.mediaType === MediaType.IMAGE ? (
-                            <Image source={{ uri: currentStep.mediaPath }} style={s.image} resizeMode="cover" />
+                        <Text style={s.stepTitle}>{currentAction.step.exerciseName}</Text>
+                        <Text style={s.setLabel}>Série {currentAction.setIndex + 1} / {currentAction.totalSets}</Text>
+                        {currentAction.step.mediaPath && currentAction.step.mediaType === MediaType.IMAGE ? (
+                            <Image source={{ uri: currentAction.step.mediaPath }} style={s.image} resizeMode="cover" />
                         ) : null}
-                        {currentStep.mediaPath && currentStep.mediaType === MediaType.VIDEO ? (
+                        {currentAction.step.mediaPath && currentAction.step.mediaType === MediaType.VIDEO ? (
                             <View style={s.mediaPlaceholder}>
                                 <Text style={s.mediaPlaceholderText}>Vidéo liée</Text>
                             </View>
                         ) : null}
-                        {currentStep.exerciseMetricType === MetricType.REPS ? (
-                            <Text style={s.metricText}>{currentStep.sets ?? '?'} séries • {currentStep.reps ?? '?'} répétitions</Text>
+                        {currentAction.step.exerciseMetricType === MetricType.REPS ? (
+                            <Text style={s.metricText}>{currentAction.step.reps ?? '?'} répétitions</Text>
                         ) : (
                             <>
                                 <Text style={s.timerValue}>{String(remainingSeconds ?? 0)}</Text>
@@ -380,10 +459,12 @@ const s = StyleSheet.create({
     playerCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.borderAccent, padding: 20, alignItems: 'center', justifyContent: 'center' },
     finishCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.borderAccent, padding: 20, alignItems: 'center', justifyContent: 'center' },
     stepTypeLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: '700', marginBottom: 10, textTransform: 'uppercase' },
-    stepTitle: { color: colors.textPrimary, fontSize: 26, fontWeight: '700', textAlign: 'center', marginBottom: 18 },
+    stepTitle: { color: colors.textPrimary, fontSize: 26, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+    setLabel: { color: colors.textSecondary, fontSize: 14, fontWeight: '600', marginBottom: 18 },
     metricText: { color: colors.textPrimary, fontSize: 18, fontWeight: '600', textAlign: 'center' },
     timerValue: { color: colors.accentPrimary, fontSize: 64, fontWeight: '700', marginBottom: 8 },
     timerLabel: { color: colors.textSecondary, fontSize: 14 },
+    nextLabel: { color: colors.textSecondary, fontSize: 14, fontWeight: '600', marginTop: 14, textAlign: 'center' },
     image: { width: '100%', height: 220, borderRadius: 12, marginBottom: 18 },
     mediaPlaceholder: { width: '100%', paddingVertical: 24, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceElevated, marginBottom: 18, alignItems: 'center' },
     mediaPlaceholderText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },

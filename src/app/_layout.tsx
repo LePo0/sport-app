@@ -5,6 +5,7 @@ import { Tabs } from 'expo-router';
 import { useFonts, Orbitron_400Regular, Orbitron_600SemiBold, Orbitron_700Bold } from '@expo-google-fonts/orbitron';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatabaseMigrations } from '../hooks/useDatabaseMigrations';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { colors } from '../theme/colors';
 
 function AppTabs() {
@@ -113,8 +114,10 @@ export default function RootLayout() {
     }
 
     return (
-        <SafeAreaProvider>
-            <AppTabs />
-        </SafeAreaProvider>
+        <ErrorBoundary>
+            <SafeAreaProvider>
+                <AppTabs />
+            </SafeAreaProvider>
+        </ErrorBoundary>
     );
 }

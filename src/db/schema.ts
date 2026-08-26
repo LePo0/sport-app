@@ -20,6 +20,7 @@ export const programs = sqliteTable('programs', {
     id: text().primaryKey(),
     name: text().notNull(),
     rounds: integer().notNull().default(1),
+    restBetweenRoundsSeconds: integer().notNull().default(0),
     createdAt: integer().notNull(), // timestamp en ms
 });
 
@@ -39,6 +40,8 @@ export const programSteps = sqliteTable(
         sets: integer(), // nombre de séries (nullable, surtout pour rest)
         reps: integer(), // nombre de reps (nullable, pour reps metric)
         durationSeconds: integer(), // durée en secondes (nullable, pour time metric et rest)
+        restAfterSetSeconds: integer().notNull().default(0), // repos après chaque série sauf la dernière
+        restAfterExerciseSeconds: integer().notNull().default(0), // repos après l'exercice sauf si dernier du tour
     }
 );
 
@@ -53,6 +56,8 @@ export const sessions = sqliteTable('sessions', {
     programName: text().notNull(),
     date: integer().notNull(), // timestamp en ms
     totalDurationSeconds: integer().notNull(),
+    rounds: integer().notNull().default(1), // snapshot du nombre de tours joués
+    restBetweenRoundsSeconds: integer().notNull().default(0), // snapshot du repos entre tours
 });
 
 /**
@@ -69,6 +74,8 @@ export const sessionSteps = sqliteTable('sessionSteps', {
     sets: integer(),
     reps: integer(),
     durationSeconds: integer(),
+    restAfterSetSeconds: integer(), // nullable : absent sur les anciennes lignes stepType='rest'
+    restAfterExerciseSeconds: integer(),
 });
 
 /**

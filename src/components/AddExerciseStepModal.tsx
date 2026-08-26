@@ -8,7 +8,14 @@ import { colors } from '../theme/colors';
 interface Props {
     visible: boolean;
     exercises: Exercise[];
-    onAdd: (exerciseId: string, sets: number | null, reps: number | null, durationSeconds: number | null) => void;
+    onAdd: (
+        exerciseId: string,
+        sets: number | null,
+        reps: number | null,
+        durationSeconds: number | null,
+        restAfterSetSeconds: number,
+        restAfterExerciseSeconds: number
+    ) => void;
     onCancel: () => void;
 }
 
@@ -18,9 +25,14 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
     const [sets, setSets] = useState('');
     const [reps, setReps] = useState('');
     const [duration, setDuration] = useState('');
+    const [restAfterSet, setRestAfterSet] = useState('');
+    const [restAfterExercise, setRestAfterExercise] = useState('');
 
     useEffect(() => {
-        if (!visible) { setSelected(null); setSets(''); setReps(''); setDuration(''); }
+        if (!visible) {
+            setSelected(null); setSets(''); setReps(''); setDuration('');
+            setRestAfterSet(''); setRestAfterExercise('');
+        }
     }, [visible]);
 
     const canAdd = !!selected && (
@@ -33,9 +45,12 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
             selected.id,
             parseInt(sets) || null,
             parseInt(reps) || null,
-            parseInt(duration) || null
+            parseInt(duration) || null,
+            parseInt(restAfterSet) || 0,
+            parseInt(restAfterExercise) || 0
         );
     };
+
 
     return (
         <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
@@ -85,6 +100,18 @@ export function AddExerciseStepModal({ visible, exercises, onAdd, onCancel }: Pr
                                         onChangeText={setDuration} placeholder="60" placeholderTextColor={colors.textSecondary} />
                                 </>
                             )}
+                            <View style={s.row}>
+                                <View style={s.half}>
+                                    <Text style={s.label}>Repos après série (s)</Text>
+                                    <TextInput style={s.input} keyboardType="numeric" value={restAfterSet}
+                                        onChangeText={setRestAfterSet} placeholder="20" placeholderTextColor={colors.textSecondary} />
+                                </View>
+                                <View style={s.half}>
+                                    <Text style={s.label}>Repos après exercice (s)</Text>
+                                    <TextInput style={s.input} keyboardType="numeric" value={restAfterExercise}
+                                        onChangeText={setRestAfterExercise} placeholder="45" placeholderTextColor={colors.textSecondary} />
+                                </View>
+                            </View>
                         </View>
                     )}
 
