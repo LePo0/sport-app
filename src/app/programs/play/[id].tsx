@@ -19,16 +19,12 @@ import { StepWithExercise } from '../../../types/program';
 import { buildRoundActions, buildPlayerSequence, PlayerAction } from '../../../services/programSequence';
 
 const PLACEMENT_SECONDS = 10;
-const CLOCK_TIC_GAP_MS = 50;
 
 export default function ProgramPlayerScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const router = useRouter();
     const sessionStartTimeRef = useRef(Date.now());
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const clockTicTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const clockTicSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-    const isCountdownActiveRef = useRef(false);
 
     const [programId, setProgramId] = useState<string | null>(id ?? null);
     const [programName, setProgramName] = useState('');
@@ -43,7 +39,8 @@ export default function ProgramPlayerScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSavingSession, setIsSavingSession] = useState(false);
     const whistlePlayer = useAudioPlayer(require('../../../../assets/sounds/whistle.mp3'));
-    const clockTicPlayer = useAudioPlayer(require('../../../../assets/sounds/clock-ticking.mp3'));
+    // WAV et non MP3 : le MP3 ajoute un delai d'encodage qui cree un trou au rebouclage
+    const clockTicPlayer = useAudioPlayer(require('../../../../assets/sounds/clock-ticking.wav'));
 
     const currentAction = sequence[currentIndex] ?? null;
     const isSequenceFinished = sequence.length > 0 && currentIndex >= sequence.length;
@@ -129,24 +126,26 @@ export default function ProgramPlayerScreen() {
         setRemainingSeconds(duration);
 
         if (isTimedExerciseSet) {
-            safeAudioCall(() => { whistlePlayer.seekTo(0); whistlePlayer.play(); });
-            // startClockTicLoop(); // désactivé temporairement
+            playWhistle();
+            startClockTicLoop();
         }
 
+        // Le compte à rebours est piloté par une variable locale : les effets sonores
+        // ne doivent pas vivre dans un updater de state (rejoué en dev/StrictMode)
+        let secondsLeft = duration;
         intervalRef.current = setInterval(() => {
-            setRemainingSeconds((prev) => {
-                if (prev === null) return null;
-                const next = prev > 0 ? prev - 1 : 0;
-                if (isTimedExerciseSet && next === 0) {
-                    stopClockTicLoop();
-                }
-                return next;
-            });
+            secondsLeft = secondsLeft > 0 ? secondsLeft - 1 : 0;
+            setRemainingSeconds(secondsLeft);
+            if (secondsLeft === 0) {
+                clearTimer();
+                stopClockTicLoop();
+                playWhistle();
+            }
         }, 1000);
 
         return () => {
             clearTimer();
-            if (isTimedExerciseSet) stopClockTicLoop();
+            stopClockTicLoop();
         };
     }, [currentIndex, currentAction, isSequenceFinished, isPlacementPhase, placementTargetIndex]);
 
@@ -171,32 +170,24 @@ export default function ProgramPlayerScreen() {
         }
     }
 
-    function stopClockTicLoop() {
-        isCountdownActiveRef.current = false;
-        if (clockTicTimeoutRef.current) {
-            clearTimeout(clockTicTimeoutRef.current);
-            clockTicTimeoutRef.current = null;
-        }
-        if (clockTicSubscriptionRef.current) {
-            clockTicSubscriptionRef.current.remove();
-            clockTicSubscriptionRef.current = null;
-        }
-        safeAudioCall(() => clockTicPlayer.pause());
+    function playWhistle() {
+        safeAudioCall(() => { whistlePlayer.seekTo(0); whistlePlayer.play(); });
     }
 
-    // Joue le clock-tic, attend la fin de la lecture puis patiente CLOCK_TIC_GAP_MS avant de rejouer
+    // Bouclage natif : le moteur audio enchaîne les répétitions sans timer JS, donc sans dérive
     function startClockTicLoop() {
-        isCountdownActiveRef.current = true;
-        clockTicSubscriptionRef.current = clockTicPlayer.addListener('playbackStatusUpdate', (status) => {
-            if (status.didJustFinish && isCountdownActiveRef.current) {
-                clockTicTimeoutRef.current = setTimeout(() => {
-                    if (isCountdownActiveRef.current) {
-                        safeAudioCall(() => { clockTicPlayer.seekTo(0); clockTicPlayer.play(); });
-                    }
-                }, CLOCK_TIC_GAP_MS);
-            }
+        safeAudioCall(() => {
+            clockTicPlayer.loop = true;
+            clockTicPlayer.seekTo(0);
+            clockTicPlayer.play();
         });
-        safeAudioCall(() => { clockTicPlayer.seekTo(0); clockTicPlayer.play(); });
+    }
+
+    function stopClockTicLoop() {
+        safeAudioCall(() => {
+            clockTicPlayer.pause();
+            clockTicPlayer.seekTo(0);
+        });
     }
 
     function formatDuration(totalSeconds: number): string {
