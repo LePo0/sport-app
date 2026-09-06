@@ -17,6 +17,7 @@ import {
 import { AddExerciseStepModal } from '../../components/AddExerciseStepModal';
 import { HeaderBackButton } from '../../components/ui/HeaderBackButton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { DraggableList } from '../../components/ui/DraggableList';
 
 export default function ProgramFormScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
@@ -39,6 +40,7 @@ export default function ProgramFormScreen() {
     const [initialRounds, setInitialRounds] = useState('1');
     const [initialRestBetweenRounds, setInitialRestBetweenRounds] = useState('');
     const [initialSteps, setInitialSteps] = useState<StepWithExercise[]>([]);
+    const [isDraggingStep, setIsDraggingStep] = useState(false);
 
     const loadSteps = useCallback(async (pid: string) => {
         const data = await getStepsForProgram(pid);
@@ -165,16 +167,12 @@ export default function ProgramFormScreen() {
         ]);
     };
 
-    const handleReorder = (step: StepWithExercise, direction: 'up' | 'down') => {
+    const handleReorder = (from: number, to: number) => {
         setSteps((prev) => {
-            const currentIndex = prev.findIndex((item) => item.id === step.id);
-            if (currentIndex < 0) return prev;
-
-            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-            if (targetIndex < 0 || targetIndex >= prev.length) return prev;
-
+            if (from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
             const next = [...prev];
-            [next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
             return next.map((item, index) => ({ ...item, orderIndex: index }));
         });
     };
@@ -228,7 +226,12 @@ export default function ProgramFormScreen() {
     }, [navigation, isSaving, hasUnsavedChanges, name, rounds, restBetweenRounds, steps, initialName, initialRounds, initialRestBetweenRounds, initialSteps]);
 
     return (
-        <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+            style={s.container}
+            contentContainerStyle={s.content}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={!isDraggingStep}
+        >
             <Stack.Screen
                 options={{
                     headerBackVisible: false,
@@ -273,53 +276,53 @@ export default function ProgramFormScreen() {
             {/* Steps */}
             <Text style={s.sectionTitle}>Séquence</Text>
             {steps.length === 0 && (
-                <Text style={s.emptyHint}>Aucune étape — ajoutez un exercice ou une pause.</Text>
+                <Text style={s.emptyHint}>Aucune étape — ajoutez un exercice.</Text>
             )}
-            {steps.map((step, idx) => (
-                <View key={step.id} style={s.stepCard}>
-                    <View style={s.stepInfo}>
-                        {step.stepType === StepType.EXERCISE ? (
-                            <>
-                                <Text style={s.stepName}>{step.exerciseName ?? 'Exercice supprimé'}</Text>
-                                <Text style={s.stepDetail}>
-                                    {step.exerciseMetricType === MetricType.REPS
-                                        ? `${step.sets ?? '?'} × ${step.reps ?? '?'} rép.`
-                                        : `${step.durationSeconds ?? '?'} s`}
-                                </Text>
-                                {(step.restAfterSetSeconds > 0 || step.restAfterExerciseSeconds > 0) && (
+            {steps.length > 1 && (
+                <Text style={s.emptyHint}>Glissez la poignée pour réordonner.</Text>
+            )}
+            <DraggableList
+                data={steps}
+                keyExtractor={(step) => step.id}
+                onReorder={handleReorder}
+                onDragStateChange={setIsDraggingStep}
+                renderItem={(step, idx, dragHandlers, isDragging) => (
+                    <View style={[s.stepCard, isDragging && s.stepCardDragging]}>
+                        <View style={s.dragHandle} {...dragHandlers}>
+                            <MaterialCommunityIcons name="drag-horizontal-variant" size={20} style={s.dragHandleIcon} />
+                        </View>
+                        <View style={s.stepInfo}>
+                            {step.stepType === StepType.EXERCISE ? (
+                                <>
+                                    <Text style={s.stepName}>{step.exerciseName ?? 'Exercice supprimé'}</Text>
                                     <Text style={s.stepDetail}>
-                                        {step.restAfterSetSeconds > 0 ? `Repos série ${step.restAfterSetSeconds}s` : null}
-                                        {step.restAfterSetSeconds > 0 && step.restAfterExerciseSeconds > 0 ? ' • ' : null}
-                                        {step.restAfterExerciseSeconds > 0 ? `Repos exercice ${step.restAfterExerciseSeconds}s` : null}
+                                        {step.exerciseMetricType === MetricType.REPS
+                                            ? `${step.sets ?? '?'} × ${step.reps ?? '?'} rép.`
+                                            : `${step.durationSeconds ?? '?'} s`}
                                     </Text>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <Text style={s.stepName}>Pause</Text>
-                                <Text style={s.stepDetail}>{step.durationSeconds ?? '?'} s</Text>
-                            </>
-                        )}
+                                    {(step.restAfterSetSeconds > 0 || step.restAfterExerciseSeconds > 0) && (
+                                        <Text style={s.stepDetail}>
+                                            {step.restAfterSetSeconds > 0 ? `Repos série ${step.restAfterSetSeconds}s` : null}
+                                            {step.restAfterSetSeconds > 0 && step.restAfterExerciseSeconds > 0 ? ' • ' : null}
+                                            {step.restAfterExerciseSeconds > 0 ? `Repos exercice ${step.restAfterExerciseSeconds}s` : null}
+                                        </Text>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={s.stepName}>Pause</Text>
+                                    <Text style={s.stepDetail}>{step.durationSeconds ?? '?'} s</Text>
+                                </>
+                            )}
+                        </View>
+                        <View style={s.stepActions}>
+                            <TouchableOpacity style={[s.iconBtn, s.iconBtnDanger]} onPress={() => handleDeleteStep(step.id)}>
+                                <MaterialCommunityIcons name="delete-outline" size={18} style={[s.iconBtnIcon, s.iconBtnIconDanger]} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={s.stepActions}>
-                        <TouchableOpacity
-                            style={[s.iconBtn, idx === 0 && s.iconBtnDisabled]}
-                            onPress={() => handleReorder(step, 'up')} disabled={idx === 0}
-                        >
-                            <MaterialCommunityIcons name="arrow-up" size={18} style={s.iconBtnIcon} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[s.iconBtn, idx === steps.length - 1 && s.iconBtnDisabled]}
-                            onPress={() => handleReorder(step, 'down')} disabled={idx === steps.length - 1}
-                        >
-                            <MaterialCommunityIcons name="arrow-down" size={18} style={s.iconBtnIcon} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[s.iconBtn, s.iconBtnDanger]} onPress={() => handleDeleteStep(step.id)}>
-                            <MaterialCommunityIcons name="delete-outline" size={18} style={[s.iconBtnIcon, s.iconBtnIconDanger]} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            ))}
+                )}
+            />
 
             {/* Boutons ajout */}
             <View style={s.addRow}>
@@ -376,12 +379,14 @@ const s = StyleSheet.create({
     inputShort: { width: 100 },
     emptyHint: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', marginBottom: 12 },
     stepCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 8, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.borderAccent },
+    stepCardDragging: { borderColor: colors.accentPrimary, backgroundColor: colors.surfaceElevated, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+    dragHandle: { paddingVertical: 8, paddingRight: 10, justifyContent: 'center' },
+    dragHandleIcon: { color: colors.textSecondary },
     stepInfo: { flex: 1 },
     stepName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
     stepDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
     stepActions: { flexDirection: 'row', gap: 6 },
     iconBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' },
-    iconBtnDisabled: { opacity: 0.3 },
     iconBtnDanger: { borderWidth: 1, borderColor: colors.danger },
     iconBtnIcon: { color: colors.textPrimary },
     iconBtnIconDanger: { color: colors.danger },
