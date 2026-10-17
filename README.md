@@ -114,4 +114,4 @@ eas build --profile production --platform android    # build de production
 
 ## Licence
 
-Voir [LICENSE](LICENSE).
+Distribué sous licence MIT. Voir [LICENSE](LICENSE).
